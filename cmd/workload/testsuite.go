@@ -77,6 +77,16 @@ var (
 		Usage:    "Use test cases for mainnet network",
 		Category: flags.TestingCategory,
 	}
+	testBepoliaFlag = &cli.BoolFlag{
+		Name:     "bepolia",
+		Usage:    "Use test cases for bepolia network",
+		Category: flags.TestingCategory,
+	}
+	testBerachainFlag = &cli.BoolFlag{
+		Name:     "berachain",
+		Usage:    "Use test cases for berachain mainnet network",
+		Category: flags.TestingCategory,
+	}
 )
 
 // testConfig holds the parameters for testing.
@@ -108,10 +118,13 @@ func validateHistoryPruneErr(err error, blockNum uint64, historyPruneBlock *uint
 	return err
 }
 
+// TODO(bera): Add test filter & history queries for Berachain mainnet & Bepolia in queries/ folder
 func testConfigFromCLI(ctx *cli.Context) (cfg testConfig) {
-	flags.CheckExclusive(ctx, testMainnetFlag, testSepoliaFlag)
-	if (ctx.IsSet(testMainnetFlag.Name) || ctx.IsSet(testSepoliaFlag.Name)) && ctx.IsSet(filterQueryFileFlag.Name) {
-		exit(filterQueryFileFlag.Name + " cannot be used with " + testMainnetFlag.Name + " or " + testSepoliaFlag.Name)
+	flags.CheckExclusive(ctx, testMainnetFlag, testSepoliaFlag, testBerachainFlag, testBepoliaFlag)
+	if (ctx.IsSet(testMainnetFlag.Name) || ctx.IsSet(testSepoliaFlag.Name) || ctx.IsSet(testBerachainFlag.Name) || ctx.IsSet(testBepoliaFlag.Name)) &&
+		ctx.IsSet(filterQueryFileFlag.Name) {
+		exit(filterQueryFileFlag.Name + " cannot be used with " + testMainnetFlag.Name + " or " +
+			testSepoliaFlag.Name + "or" + testBerachainFlag.Name + " or " + testBepoliaFlag.Name)
 	}
 
 	// configure ethclient
@@ -131,6 +144,18 @@ func testConfigFromCLI(ctx *cli.Context) (cfg testConfig) {
 		cfg.historyTestFile = "queries/history_sepolia.json"
 		cfg.historyPruneBlock = new(uint64)
 		*cfg.historyPruneBlock = history.PrunePoints[params.SepoliaGenesisHash].BlockNumber
+	case ctx.Bool(testBerachainFlag.Name):
+		cfg.fsys = builtinTestFiles
+		cfg.filterQueryFile = "queries/filter_queries_berachain.json"
+		cfg.historyTestFile = "queries/history_berachain.json"
+		cfg.historyPruneBlock = new(uint64)
+		*cfg.historyPruneBlock = history.PrunePoints[params.BerachainGenesisHash].BlockNumber
+	case ctx.Bool(testBepoliaFlag.Name):
+		cfg.fsys = builtinTestFiles
+		cfg.filterQueryFile = "queries/filter_queries_bepolia.json"
+		cfg.historyTestFile = "queries/history_bepolia.json"
+		cfg.historyPruneBlock = new(uint64)
+		*cfg.historyPruneBlock = history.PrunePoints[params.BepoliaGenesisHash].BlockNumber
 	default:
 		cfg.fsys = os.DirFS(".")
 		cfg.filterQueryFile = ctx.String(filterQueryFileFlag.Name)

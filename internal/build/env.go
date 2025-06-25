@@ -92,6 +92,53 @@ func Env() Environment {
 			IsPullRequest: os.Getenv("APPVEYOR_PULL_REQUEST_NUMBER") != "",
 			IsCronJob:     os.Getenv("APPVEYOR_SCHEDULED_BUILD") == "True",
 		}
+	case os.Getenv("CI") == "true" && os.Getenv("GITHUB_ACTIONS") == "true":
+		commit := os.Getenv("GITHUB_SHA")
+		reftype := os.Getenv("GITHUB_REF_TYPE")
+		isPR := os.Getenv("GITHUB_HEAD_REF") != ""
+		tag := ""
+		branch := ""
+		if reftype == "" {
+			gref := os.Getenv("GITHUB_REF")
+			if strings.HasPrefix(gref, "refs/heads/") {
+				reftype = "branch"
+			} else if strings.HasPrefix(gref, "refs/tags/") {
+				reftype = "tag"
+			}
+		}
+		switch {
+		case isPR:
+			branch = os.Getenv("GITHUB_BASE_REF")
+		case reftype == "branch":
+			branch = os.Getenv("GITHUB_REF_NAME")
+		case reftype == "tag":
+			tag = os.Getenv("GITHUB_REF_NAME")
+		}
+
+		// Fallback: If tag or branch is still empty, derive from GITHUB_REF.
+		if tag == "" && branch == "" {
+			if gref := os.Getenv("GITHUB_REF"); gref != "" {
+				if strings.HasPrefix(gref, "refs/tags/") {
+					tag = strings.TrimPrefix(gref, "refs/tags/")
+				} else if strings.HasPrefix(gref, "refs/heads/") {
+					branch = strings.TrimPrefix(gref, "refs/heads/")
+				}
+			}
+		}
+
+		return Environment{
+			CI:            true,
+			Name:          "github-actions",
+			Repo:          os.Getenv("GITHUB_REPOSITORY"),
+			Commit:        commit,
+			Date:          getDate(commit),
+			Branch:        branch,
+			Tag:           tag,
+			IsPullRequest: isPR,
+			Buildnum:      os.Getenv("GITHUB_RUN_ID"),
+			IsCronJob:     os.Getenv("GITHUB_EVENT_NAME") == "schedule",
+		}
+
 	default:
 		return LocalEnv()
 	}
@@ -99,7 +146,7 @@ func Env() Environment {
 
 // LocalEnv returns build environment metadata gathered from git.
 func LocalEnv() Environment {
-	env := applyEnvFlags(Environment{Name: "local", Repo: "ethereum/go-ethereum"})
+	env := applyEnvFlags(Environment{Name: "local", Repo: "berachain/bera-geth"})
 
 	head := readGitFile("HEAD")
 	if fields := strings.Fields(head); len(fields) == 2 {

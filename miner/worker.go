@@ -452,6 +452,8 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	prio := miner.prio
 	miner.confMu.RUnlock()
 
+	// env.txs = append(env.txs, DistributeForTx)
+
 	// Retrieve the pending transactions pre-filtered by the 1559/4844 dynamic fees
 	filter := txpool.PendingFilter{
 		MinTip: uint256.MustFromBig(tip),

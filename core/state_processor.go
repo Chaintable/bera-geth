@@ -96,7 +96,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 
-		// if i == 0 {
+		// if isPrague1 and i == 0 {
 		//    tx.Type() MUST equal DistributeForTxType
 		// }
 

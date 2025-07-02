@@ -23,21 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-const (
-	// PubkeySize represents the expected byte length of a BLS12-381 public key
-	// as used by the beacon chain.
-	PubkeySize = 48
-)
+// PubkeySize represents the expected byte length of a BLS12-381 public key
+// as used by the beacon chain.
+const PubkeySize = 48
 
 // Pubkey represents a fixed-length 48-byte BLS public key.
 // JSON and text serialization use 0x-prefixed hex strings.
-// For SSZ purposes it would be serialized as Vector[Byte,48], but the type is
-// kept intentionally lightweight here because bera-geth does not perform SSZ
-// processing directly.
-//
-// Note: This implementation mimics the beacon-kit B48 helper so that the same
-// public-key strings coming from the beacon API can be decoded by bera-geth
-// without additional glue code.
 type Pubkey [PubkeySize]byte
 
 // Bytes returns a copy of the underlying byte slice.
@@ -51,10 +42,6 @@ func (p Pubkey) Bytes() []byte {
 func (p Pubkey) String() string {
 	return hexutil.Encode(p[:])
 }
-
-/* -------------------------------------------------------------------------- */
-/*                               TextMarshaler                                */
-/* -------------------------------------------------------------------------- */
 
 // MarshalText encodes the pubkey as a 0x-prefixed hex string.
 func (p Pubkey) MarshalText() ([]byte, error) {
@@ -74,10 +61,6 @@ func (p *Pubkey) UnmarshalText(text []byte) error {
 	copy(p[:], b)
 	return nil
 }
-
-/* -------------------------------------------------------------------------- */
-/*                               JSONMarshaler                                */
-/* -------------------------------------------------------------------------- */
 
 // MarshalJSON encodes the pubkey as a JSON string.
 func (p Pubkey) MarshalJSON() ([]byte, error) {

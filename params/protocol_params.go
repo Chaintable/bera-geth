@@ -193,7 +193,7 @@ var (
 
 // System contracts.
 var (
-	// SystemAddress is where the system-transaction is sent from as per EIP-4788
+	// SystemAddress is where the system-transaction is sent from as per EIP-4788 and BRIP-0004.
 	SystemAddress = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
 
 	// EIP-4788 - Beacon block root in the EVM

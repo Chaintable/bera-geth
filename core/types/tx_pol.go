@@ -22,8 +22,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+// PoLTx implements the TxData interface.
+var _ TxData = (*PoLTx)(nil)
 
 // PoLTx represents an BRIP-0004 transaction.
 type PoLTx struct {
@@ -33,20 +37,23 @@ type PoLTx struct {
 	BlockNumber uint64
 }
 
-// ===== TxData interface implementation =====
-
 func (*PoLTx) txType() byte { return PoLTxType }
 
+// copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *PoLTx) copy() TxData {
-	return &PoLTx{
-		ChainID:     tx.ChainID,
-		Pubkey:      tx.Pubkey,
-		To:          tx.To,
+	cpy := &PoLTx{
+		ChainID:     new(big.Int),
+		Pubkey:      copyPubkeyPtr(tx.Pubkey),
+		To:          copyAddressPtr(tx.To),
 		BlockNumber: tx.BlockNumber,
 	}
+	if tx.ChainID != nil {
+		cpy.ChainID.Set(tx.ChainID)
+	}
+	return cpy
 }
 
-func (*PoLTx) chainID() *big.Int      { return big.NewInt(0) }
+func (tx *PoLTx) chainID() *big.Int   { return tx.ChainID }
 func (*PoLTx) accessList() AccessList { return nil }
 func (tx *PoLTx) data() []byte        { return mustGetDistributeForData(tx.Pubkey) }
 func (*PoLTx) gas() uint64            { return 0 }
@@ -79,15 +86,23 @@ func (tx *PoLTx) decode(input []byte) error {
 	return rlp.DecodeBytes(input, tx)
 }
 
-// TODO: make like DynamicFeeTx.sigHash
 func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
-	return common.Hash{}
+	return prefixedRlpHash(
+		PoLTxType,
+		[]any{
+			chainID,              // chainID: EIP-155 chain ID
+			params.SystemAddress, // from: system address
+			tx.Pubkey,            // pubkey distributing for
+			tx.To,                // to: address of the PoL Distributor contract.
+			tx.BlockNumber,       // nonce: block number being distributed for
+		})
 }
 
 // mustGetDistributeForData returns the tx data for the distributeFor method.
 func mustGetDistributeForData(pubkey *Pubkey) []byte {
 	bytesT, err := abi.NewType("bytes", "", nil)
 	if err != nil {
+		// NOTE: this should never happen.
 		panic(err)
 	}
 
@@ -99,6 +114,7 @@ func mustGetDistributeForData(pubkey *Pubkey) []byte {
 
 	data, err := distributeForMethod.Inputs.Pack(pubkey)
 	if err != nil {
+		// NOTE: this should never happen.
 		panic(err)
 	}
 	return data

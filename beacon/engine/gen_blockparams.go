@@ -6,10 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/beacon/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	types0 "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 var _ = (*payloadAttributesMarshaling)(nil)
@@ -17,12 +16,12 @@ var _ = (*payloadAttributesMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (p PayloadAttributes) MarshalJSON() ([]byte, error) {
 	type PayloadAttributes struct {
-		Timestamp             hexutil.Uint64       `json:"timestamp"             gencodec:"required"`
-		Random                common.Hash          `json:"prevRandao"            gencodec:"required"`
-		SuggestedFeeRecipient common.Address       `json:"suggestedFeeRecipient" gencodec:"required"`
-		Withdrawals           []*types0.Withdrawal `json:"withdrawals"`
-		BeaconRoot            *common.Hash         `json:"parentBeaconBlockRoot"`
-		ProposerPubkey        *types.Pubkey        `json:"parentProposerPubkey"`
+		Timestamp             hexutil.Uint64      `json:"timestamp"             gencodec:"required"`
+		Random                common.Hash         `json:"prevRandao"            gencodec:"required"`
+		SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
+		Withdrawals           []*types.Withdrawal `json:"withdrawals"`
+		BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
+		ProposerPubkey        *types.Pubkey       `json:"parentProposerPubkey"`
 	}
 	var enc PayloadAttributes
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
@@ -37,12 +36,12 @@ func (p PayloadAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (p *PayloadAttributes) UnmarshalJSON(input []byte) error {
 	type PayloadAttributes struct {
-		Timestamp             *hexutil.Uint64      `json:"timestamp"             gencodec:"required"`
-		Random                *common.Hash         `json:"prevRandao"            gencodec:"required"`
-		SuggestedFeeRecipient *common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
-		Withdrawals           []*types0.Withdrawal `json:"withdrawals"`
-		BeaconRoot            *common.Hash         `json:"parentBeaconBlockRoot"`
-		ProposerPubkey        *types.Pubkey        `json:"parentProposerPubkey"`
+		Timestamp             *hexutil.Uint64     `json:"timestamp"             gencodec:"required"`
+		Random                *common.Hash        `json:"prevRandao"            gencodec:"required"`
+		SuggestedFeeRecipient *common.Address     `json:"suggestedFeeRecipient" gencodec:"required"`
+		Withdrawals           []*types.Withdrawal `json:"withdrawals"`
+		BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
+		ProposerPubkey        *types.Pubkey       `json:"parentProposerPubkey"`
 	}
 	var dec PayloadAttributes
 	if err := json.Unmarshal(input, &dec); err != nil {

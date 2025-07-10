@@ -21,7 +21,6 @@ import (
 	"math/big"
 	"slices"
 
-	btypes "github.com/ethereum/go-ethereum/beacon/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -49,7 +48,7 @@ type PayloadAttributes struct {
 	SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
 	Withdrawals           []*types.Withdrawal `json:"withdrawals"`
 	BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
-	ProposerPubkey        *btypes.Pubkey      `json:"parentProposerPubkey"` // only used prague1 and onwards
+	ProposerPubkey        *types.Pubkey       `json:"parentProposerPubkey"` // Berachain: only used prague1 and onwards
 }
 
 // JSON type overrides for PayloadAttributes.

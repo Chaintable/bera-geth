@@ -92,8 +92,8 @@ func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 		[]any{
 			chainID,              // chainID: EIP-155 chain ID
 			params.SystemAddress, // from: system address
-			tx.Pubkey,            // pubkey distributing for
 			tx.To,                // to: address of the PoL Distributor contract.
+			tx.Pubkey,            // pubkey distributing for
 			tx.BlockNumber,       // nonce: block number being distributed for
 		})
 }

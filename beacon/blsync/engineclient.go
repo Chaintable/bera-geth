@@ -93,6 +93,7 @@ func (ec *engineClient) updateLoop(headCh <-chan types.ChainHeadEvent) {
 	}
 }
 
+// TODO(BRIP-4): Add ParentProposerPubkey to the chainHeadEvent for "electra1" fork.
 func (ec *engineClient) callNewPayload(fork string, event types.ChainHeadEvent) (string, error) {
 	execData := engine.BlockToExecutableData(event.Block, nil, nil, nil).ExecutionPayload
 
@@ -101,6 +102,15 @@ func (ec *engineClient) callNewPayload(fork string, event types.ChainHeadEvent) 
 		params = []any{execData}
 	)
 	switch fork {
+	case "electra1":
+		method = "engine_newPayloadV4"
+		parentBeaconRoot := event.BeaconHead.ParentRoot
+		blobHashes := collectBlobHashes(event.Block)
+		hexRequests := make([]hexutil.Bytes, len(event.ExecRequests))
+		for i := range event.ExecRequests {
+			hexRequests[i] = hexutil.Bytes(event.ExecRequests[i])
+		}
+		params = append(params, blobHashes, parentBeaconRoot, hexRequests)
 	case "electra":
 		method = "engine_newPayloadV4"
 		parentBeaconRoot := event.BeaconHead.ParentRoot

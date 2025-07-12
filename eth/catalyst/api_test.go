@@ -305,7 +305,7 @@ func TestEth2NewBlock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create the executable data, block %d: %v", i, err)
 		}
-		block, err := engine.ExecutableDataToBlock(*execData, nil, nil, nil)
+		block, err := engine.ExecutableDataToBlock(*execData, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Failed to convert executable data to block %v", err)
 		}
@@ -347,7 +347,7 @@ func TestEth2NewBlock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create the executable data %v", err)
 		}
-		block, err := engine.ExecutableDataToBlock(*execData, nil, nil, nil)
+		block, err := engine.ExecutableDataToBlock(*execData, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Failed to convert executable data to block %v", err)
 		}
@@ -472,10 +472,10 @@ func TestFullAPI(t *testing.T) {
 		ethservice.TxPool().Add([]*types.Transaction{tx}, false)
 	}
 
-	setupBlocks(t, ethservice, 10, parent, callback, nil, nil)
+	setupBlocks(t, ethservice, 10, parent, callback, nil, nil, nil)
 }
 
-func setupBlocks(t *testing.T, ethservice *eth.Ethereum, n int, parent *types.Header, callback func(parent *types.Header), withdrawals [][]*types.Withdrawal, beaconRoots []common.Hash) []*types.Header {
+func setupBlocks(t *testing.T, ethservice *eth.Ethereum, n int, parent *types.Header, callback func(parent *types.Header), withdrawals [][]*types.Withdrawal, beaconRoots []common.Hash, proposerPubkeys []types.Pubkey) []*types.Header {
 	api := NewConsensusAPI(ethservice)
 	var blocks []*types.Header
 	for i := 0; i < n; i++ {
@@ -488,9 +488,13 @@ func setupBlocks(t *testing.T, ethservice *eth.Ethereum, n int, parent *types.He
 		if beaconRoots != nil {
 			h = &beaconRoots[i]
 		}
+		var p *types.Pubkey
+		if proposerPubkeys != nil {
+			p = &proposerPubkeys[i]
+		}
 
 		envelope := getNewEnvelope(t, api, parent, w, h)
-		execResp, err := api.newPayload(*envelope.ExecutionPayload, []common.Hash{}, h, envelope.Requests, false)
+		execResp, err := api.newPayload(*envelope.ExecutionPayload, []common.Hash{}, h, envelope.Requests, false, p)
 		if err != nil {
 			t.Fatalf("can't execute payload: %v", err)
 		}
@@ -691,7 +695,7 @@ func TestEmptyBlocks(t *testing.T) {
 	api := NewConsensusAPI(ethservice)
 
 	// Setup 10 blocks on the canonical chain
-	setupBlocks(t, ethservice, 10, commonAncestor, func(parent *types.Header) {}, nil, nil)
+	setupBlocks(t, ethservice, 10, commonAncestor, func(parent *types.Header) {}, nil, nil, nil)
 
 	// (1) check LatestValidHash by sending a normal payload (P1'')
 	payload := getNewPayload(t, api, commonAncestor, nil, nil)
@@ -820,7 +824,7 @@ func TestTrickRemoteBlockCache(t *testing.T) {
 	commonAncestor := ethserviceA.BlockChain().CurrentBlock()
 
 	// Setup 10 blocks on the canonical chain
-	setupBlocks(t, ethserviceA, 10, commonAncestor, func(parent *types.Header) {}, nil, nil)
+	setupBlocks(t, ethserviceA, 10, commonAncestor, func(parent *types.Header) {}, nil, nil, nil)
 	commonAncestor = ethserviceA.BlockChain().CurrentBlock()
 
 	var invalidChain []*engine.ExecutableData
@@ -875,7 +879,7 @@ func TestInvalidBloom(t *testing.T) {
 	api := NewConsensusAPI(ethservice)
 
 	// Setup 10 blocks on the canonical chain
-	setupBlocks(t, ethservice, 10, commonAncestor, func(parent *types.Header) {}, nil, nil)
+	setupBlocks(t, ethservice, 10, commonAncestor, func(parent *types.Header) {}, nil, nil, nil)
 
 	// (1) check LatestValidHash by sending a normal payload (P1'')
 	payload := getNewPayload(t, api, commonAncestor, nil, nil)
@@ -935,7 +939,7 @@ func TestSimultaneousNewBlock(t *testing.T) {
 				t.Fatal(testErr)
 			}
 		}
-		block, err := engine.ExecutableDataToBlock(*execData, nil, nil, nil)
+		block, err := engine.ExecutableDataToBlock(*execData, nil, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Failed to convert executable data to block %v", err)
 		}
@@ -1274,8 +1278,14 @@ func setupBodies(t *testing.T) (*node.Node, *eth.Ethereum, []*types.Block) {
 		beaconRoots[i] = common.Hash{byte(i)}
 	}
 
+	// Make proposer pubkey update for each block.
+	proposerPubkeys := make([]types.Pubkey, 10)
+	for i := 0; i < 10; i++ {
+		proposerPubkeys[i] = types.Pubkey{byte(i)}
+	}
+
 	// Create the blocks.
-	newHeaders := setupBlocks(t, ethservice, 10, parent, callback, withdrawals, beaconRoots)
+	newHeaders := setupBlocks(t, ethservice, 10, parent, callback, withdrawals, beaconRoots, proposerPubkeys)
 	newBlocks := make([]*types.Block, len(newHeaders))
 	for i, header := range newHeaders {
 		newBlocks[i] = ethservice.BlockChain().GetBlock(header.Hash(), header.Number.Uint64())
@@ -1534,7 +1544,7 @@ func TestBlockToPayloadWithBlobs(t *testing.T) {
 	if got := len(envelope.BlobsBundle.Blobs); got != want {
 		t.Fatalf("invalid number of blobs: got %v, want %v", got, want)
 	}
-	_, err := engine.ExecutableDataToBlock(*envelope.ExecutionPayload, make([]common.Hash, 1), nil, nil)
+	_, err := engine.ExecutableDataToBlock(*envelope.ExecutionPayload, make([]common.Hash, 1), nil, nil, nil)
 	if err != nil {
 		t.Error(err)
 	}

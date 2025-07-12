@@ -156,14 +156,15 @@ func (miner *Miner) getPending() *newPayloadResult {
 		withdrawal = []*types.Withdrawal{}
 	}
 	ret := miner.generateWork(&generateParams{
-		timestamp:   timestamp,
-		forceTime:   false,
-		parentHash:  header.Hash(),
-		coinbase:    miner.config.PendingFeeRecipient,
-		random:      common.Hash{},
-		withdrawals: withdrawal,
-		beaconRoot:  nil,
-		noTxs:       false,
+		timestamp:      timestamp,
+		forceTime:      false,
+		parentHash:     header.Hash(),
+		coinbase:       miner.config.PendingFeeRecipient,
+		random:         common.Hash{},
+		withdrawals:    withdrawal,
+		beaconRoot:     nil,
+		proposerPubkey: nil,
+		noTxs:          false,
 	}, false) // we will never make a witness for a pending block
 	if ret.err != nil {
 		return nil

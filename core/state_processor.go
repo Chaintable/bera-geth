@@ -62,7 +62,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		blockHash   = block.Hash()
 		blockNumber = block.Number()
 		allLogs     []*types.Log
-		gp          = new(GasPool).AddGas(block.GasLimit())
+		blockGP     = new(GasPool).AddGas(block.GasLimit())
+		polGP       = new(GasPool).AddGas(params.PoLTxGasLimit) // Berachain specific: PoL tx has a gas limit of 100M
 	)
 
 	// Mutate the block and state according to any hard-fork specs
@@ -89,20 +90,34 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 
+	// Berachain: validate the prague1 block has PoL tx.
+	if p.config.IsPrague1(block.Number(), block.Time()) {
+		if err := ValidatePrague1Block(block); err != nil {
+			return nil, fmt.Errorf("could not validate prague1 block: %w", err)
+		}
+	}
+
+	var (
+		gp           = blockGP
+		blockGasUsed = usedGas
+	)
+
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
+		if i == 0 && p.config.IsPrague1(block.Number(), block.Time()) {
+			// Berachain: for the PoL tx, we don't charge gas from the block.
+			gp = polGP
+			blockGasUsed = new(uint64)
+		}
+
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 
-		// if isPrague1 and i == 0 {
-		//    tx.Type() MUST equal DistributeForTxType
-		// }
-
 		statedb.SetTxContext(tx.Hash(), i)
 
-		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, usedGas, evm)
+		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, blockGasUsed, evm)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
@@ -215,6 +230,28 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 	}
 	// Create a new context to be used in the EVM environment
 	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm)
+}
+
+// BuildPoLTx builds the PoL tx for a specific block and proposer pubkey.
+func BuildPoLTx(blockNumber *big.Int, proposerPubkey *types.Pubkey) *types.Transaction {
+	// TODO(BRIP-4): implement.
+	return nil
+}
+
+// ValidatePoLTx validates the PoL tx.
+func ValidatePrague1Block(block *types.Block) error {
+	// Build PoL tx.
+	polTx := BuildPoLTx(block.Number(), block.ProposerPubkey())
+	if polTx == nil {
+		return fmt.Errorf("failed to build PoL tx")
+	}
+
+	// Validate PoL tx is the first tx in the block.
+	if block.Transactions()[0].Hash() != polTx.Hash() {
+		return fmt.Errorf("tx hash mismatch: have %v, want %v", block.Transactions()[0].Hash(), polTx.Hash())
+	}
+
+	return nil
 }
 
 // ProcessBeaconBlockRoot applies the EIP-4788 system call to the beacon block root

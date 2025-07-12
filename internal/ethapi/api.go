@@ -904,6 +904,9 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 	if head.RequestsHash != nil {
 		result["requestsHash"] = head.RequestsHash
 	}
+	if head.ParentProposerPubkey != nil {
+		result["parentProposerPubkey"] = head.ParentProposerPubkey
+	}
 	return result
 }
 

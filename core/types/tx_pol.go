@@ -35,6 +35,7 @@ type PoLTx struct {
 	Pubkey      *Pubkey
 	To          *common.Address // address of the PoL Distributor contract.
 	BlockNumber uint64
+	GasLimit    uint64
 }
 
 func (*PoLTx) txType() byte { return PoLTxType }
@@ -46,6 +47,7 @@ func (tx *PoLTx) copy() TxData {
 		Pubkey:      copyPubkeyPtr(tx.Pubkey),
 		To:          copyAddressPtr(tx.To),
 		BlockNumber: tx.BlockNumber,
+		GasLimit:    tx.GasLimit,
 	}
 	if tx.ChainID != nil {
 		cpy.ChainID.Set(tx.ChainID)
@@ -56,7 +58,7 @@ func (tx *PoLTx) copy() TxData {
 func (tx *PoLTx) chainID() *big.Int   { return tx.ChainID }
 func (*PoLTx) accessList() AccessList { return nil }
 func (tx *PoLTx) data() []byte        { return mustGetDistributeForData(tx.Pubkey) }
-func (*PoLTx) gas() uint64            { return 0 }
+func (tx *PoLTx) gas() uint64         { return tx.GasLimit }
 func (*PoLTx) gasPrice() *big.Int     { return new(big.Int) }
 func (*PoLTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) gasFeeCap() *big.Int    { return new(big.Int) }

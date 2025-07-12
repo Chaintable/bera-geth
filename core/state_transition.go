@@ -187,7 +187,8 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		BlobGasFeeCap:         tx.BlobGasFeeCap(),
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	if baseFee != nil {
+	// Berachain: If PoL tx, we don't set a gas price.
+	if baseFee != nil && tx.Type() != types.PoLTxType {
 		msg.GasPrice = msg.GasPrice.Add(msg.GasTipCap, baseFee)
 		if msg.GasPrice.Cmp(msg.GasFeeCap) > 0 {
 			msg.GasPrice = msg.GasFeeCap

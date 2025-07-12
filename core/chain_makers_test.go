@@ -79,6 +79,7 @@ func TestGeneratePOSChain(t *testing.T) {
 
 	genchain, genreceipts := GenerateChain(gspec.Config, genesis, engine, gendb, 4, func(i int, gen *BlockGen) {
 		gen.SetParentBeaconRoot(common.Hash{byte(i + 1)})
+		gen.SetParentProposerPubkey(types.Pubkey{byte(i + 1)})
 
 		// Add value transfer tx.
 		tx := types.MustSignNewTx(key, gen.Signer(), &types.LegacyTx{
@@ -177,6 +178,12 @@ func TestGeneratePOSChain(t *testing.T) {
 		got := state.GetState(params.BeaconRootsAddress, common.BigToHash(new(big.Int).SetUint64(idx)))
 		if got != want {
 			t.Fatalf("block %d, wrong parent beacon root in state: got %s, want %s", i, got, want)
+		}
+
+		// Verify proposer pubkey.
+		expect := types.Pubkey{byte(blocknum)}
+		if got := block.ProposerPubkey(); *got != expect {
+			t.Fatalf("block %d, wrong proposer pubkey: got %s, want %s", i, got, expect)
 		}
 	}
 }

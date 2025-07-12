@@ -101,6 +101,7 @@ type stEnv struct {
 	ParentExcessBlobGas   *uint64                             `json:"parentExcessBlobGas,omitempty"`
 	ParentBlobGasUsed     *uint64                             `json:"parentBlobGasUsed,omitempty"`
 	ParentBeaconBlockRoot *common.Hash                        `json:"parentBeaconBlockRoot"`
+	ParentProposerPubkey  *types.Pubkey                       `json:"parentProposerPubkey"`
 }
 
 type stEnvMarshaling struct {
@@ -127,6 +128,7 @@ type rejectedTx struct {
 }
 
 // Apply applies a set of transactions to a pre-state
+// TODO(BRIP-4): Add PoL tx to processing automatically or expect it to be added by the caller.
 func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig, txIt txIterator, miningReward int64) (*state.StateDB, *ExecutionResult, []byte, error) {
 	// Capture errors for BLOCKHASH operation, if we haven't been supplied the
 	// required blockhashes

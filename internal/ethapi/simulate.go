@@ -206,6 +206,7 @@ func (sim *simulator) execute(ctx context.Context, blocks []simBlock) ([]*simBlo
 	return results, nil
 }
 
+// TODO(BRIP-4): Add PoL tx to simulated processing automatically or expect it to be added by the caller.
 func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header, parent *types.Header, headers []*types.Header, timeout time.Duration) (*types.Block, []simCallResult, map[common.Hash]common.Address, error) {
 	// Set header fields that depend only on parent block.
 	// Parent hash is needed for evm.GetHashFn to work.
@@ -484,15 +485,23 @@ func (sim *simulator) makeHeaders(blocks []simBlock) ([]*types.Header, error) {
 				parentBeaconRoot = overrides.BeaconRoot
 			}
 		}
+		var parentProposerPubkey *types.Pubkey
+		if sim.chainConfig.IsPrague1(overrides.Number.ToInt(), (uint64)(*overrides.Time)) {
+			parentProposerPubkey = new(types.Pubkey)
+			if overrides.ProposerPubkey != nil {
+				*parentProposerPubkey = *overrides.ProposerPubkey
+			}
+		}
 		header = overrides.MakeHeader(&types.Header{
-			UncleHash:        types.EmptyUncleHash,
-			ReceiptHash:      types.EmptyReceiptsHash,
-			TxHash:           types.EmptyTxsHash,
-			Coinbase:         header.Coinbase,
-			Difficulty:       header.Difficulty,
-			GasLimit:         header.GasLimit,
-			WithdrawalsHash:  withdrawalsHash,
-			ParentBeaconRoot: parentBeaconRoot,
+			UncleHash:            types.EmptyUncleHash,
+			ReceiptHash:          types.EmptyReceiptsHash,
+			TxHash:               types.EmptyTxsHash,
+			Coinbase:             header.Coinbase,
+			Difficulty:           header.Difficulty,
+			GasLimit:             header.GasLimit,
+			WithdrawalsHash:      withdrawalsHash,
+			ParentBeaconRoot:     parentBeaconRoot,
+			ParentProposerPubkey: parentProposerPubkey,
 		})
 		res[bi] = header
 	}

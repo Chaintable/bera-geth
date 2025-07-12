@@ -469,9 +469,12 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 
 	// Berachain: Post-Prague1, add PoL tx to the block according to BRIP-0004.
 	if miner.chainConfig.IsPrague1(env.header.Number, env.header.Time) {
-		if err := miner.commitTransaction(
-			env, core.BuildPoLTx(env.header.Number, env.header.ParentProposerPubkey),
-		); err != nil {
+		polTx := core.BuildPoLTx(
+			miner.chainConfig.ChainID,
+			env.header.ParentProposerPubkey,
+			miner.chainConfig.Berachain.Prague1.PoLDistributorAddress,
+		)
+		if err := miner.commitTransaction(env, polTx); err != nil {
 			return err
 		}
 	}

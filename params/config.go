@@ -548,6 +548,8 @@ type Prague1Config struct {
 	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator,omitempty"`
 	// MinimumBaseFeeWei is the minimum base fee in wei.
 	MinimumBaseFeeWei uint64 `json:"minimumBaseFeeWei,omitempty"`
+	// PoLDistributorAddress is the address of the PoL distributor.
+	PoLDistributorAddress common.Address `json:"polDistributorAddress,omitempty"`
 }
 
 // String implements the stringer interface.
@@ -555,8 +557,8 @@ func (c Prague1Config) String() string {
 	banner := "prague1"
 	if c.Time != nil {
 		banner += fmt.Sprintf(
-			"(time: %v, baseFeeChangeDenominator: %v, minimumBaseFeeWei: %v)",
-			*c.Time, c.BaseFeeChangeDenominator, c.MinimumBaseFeeWei,
+			"(time: %v, baseFeeChangeDenominator: %v, minimumBaseFeeWei: %v, polDistributorAddress: %v)",
+			*c.Time, c.BaseFeeChangeDenominator, c.MinimumBaseFeeWei, c.PoLDistributorAddress,
 		)
 	}
 	return banner

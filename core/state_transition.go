@@ -166,6 +166,9 @@ type Message struct {
 
 	// When SkipFromEOACheck is true, the message sender is not checked to be an EOA.
 	SkipFromEOACheck bool
+
+	// Berachain: IsPoLTx is true if the message is a PoL tx.
+	IsPoLTx bool
 }
 
 // TransactionToMessage converts a transaction into a Message.
@@ -185,10 +188,10 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipFromEOACheck:      false,
 		BlobHashes:            tx.BlobHashes(),
 		BlobGasFeeCap:         tx.BlobGasFeeCap(),
+		IsPoLTx:               tx.Type() == types.PoLTxType, // Berachain: BRIP-0004 PoL tx
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	// Berachain: If PoL tx, we don't set a gas price.
-	if baseFee != nil && tx.Type() != types.PoLTxType {
+	if baseFee != nil {
 		msg.GasPrice = msg.GasPrice.Add(msg.GasTipCap, baseFee)
 		if msg.GasPrice.Cmp(msg.GasFeeCap) > 0 {
 			msg.GasPrice = msg.GasFeeCap
@@ -419,9 +422,14 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	// 5. there is no overflow when calculating intrinsic gas
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 
-	// Check clauses 1-3, buy gas if everything is correct
-	if err := st.preCheck(); err != nil {
-		return nil, err
+	if !st.msg.IsPoLTx {
+		// Berachain: For PoL tx, we do not need to do the preCheck nor buy gas.
+		st.gasRemaining, st.initialGas = st.msg.GasLimit, st.msg.GasLimit
+	} else {
+		// Check clauses 1-3, buy gas if everything is correct
+		if err := st.preCheck(); err != nil {
+			return nil, err
+		}
 	}
 
 	var (

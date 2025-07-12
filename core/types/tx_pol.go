@@ -31,10 +31,10 @@ var _ TxData = (*PoLTx)(nil)
 
 // PoLTx represents an BRIP-0004 transaction.
 type PoLTx struct {
-	ChainID     *big.Int
-	Pubkey      *Pubkey
-	To          *common.Address // address of the PoL Distributor contract.
-	BlockNumber uint64
+	ChainID *big.Int
+	Pubkey  *Pubkey
+	To      *common.Address // address of the PoL Distributor contract.
+	Nonce   uint64
 }
 
 func (*PoLTx) txType() byte { return PoLTxType }
@@ -42,10 +42,10 @@ func (*PoLTx) txType() byte { return PoLTxType }
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *PoLTx) copy() TxData {
 	cpy := &PoLTx{
-		ChainID:     new(big.Int),
-		Pubkey:      copyPubkeyPtr(tx.Pubkey),
-		To:          copyAddressPtr(tx.To),
-		BlockNumber: tx.BlockNumber,
+		ChainID: new(big.Int),
+		Pubkey:  copyPubkeyPtr(tx.Pubkey),
+		To:      copyAddressPtr(tx.To),
+		Nonce:   tx.Nonce,
 	}
 	if tx.ChainID != nil {
 		cpy.ChainID.Set(tx.ChainID)
@@ -61,7 +61,7 @@ func (*PoLTx) gasPrice() *big.Int     { return new(big.Int) }
 func (*PoLTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) value() *big.Int        { return new(big.Int) }
-func (tx *PoLTx) nonce() uint64       { return tx.BlockNumber }
+func (tx *PoLTx) nonce() uint64       { return tx.Nonce }
 func (tx *PoLTx) to() *common.Address { return tx.To }
 
 // No-op: PoLTx is system-signed and carries no signature.
@@ -94,7 +94,7 @@ func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 			params.SystemAddress, // from: system address
 			tx.To,                // to: address of the PoL Distributor contract.
 			tx.Pubkey,            // pubkey distributing for
-			tx.BlockNumber,       // nonce: block number being distributed for
+			tx.Nonce,             // nonce
 		})
 }
 

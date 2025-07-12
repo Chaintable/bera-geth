@@ -92,7 +92,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 	// Berachain: validate the prague1 block has PoL tx.
 	if p.config.IsPrague1(block.Number(), block.Time()) {
-		if err := ValidatePrague1Block(block); err != nil {
+		if err := ValidatePrague1Block(block, p.config.Berachain.Prague1.PoLDistributorAddress); err != nil {
 			return nil, fmt.Errorf("could not validate prague1 block: %w", err)
 		}
 	}
@@ -233,15 +233,25 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 }
 
 // BuildPoLTx builds the PoL tx for a specific block and proposer pubkey.
-func BuildPoLTx(blockNumber *big.Int, proposerPubkey *types.Pubkey) *types.Transaction {
-	// TODO(BRIP-4): implement.
-	return nil
+func BuildPoLTx(
+	chainID *big.Int,
+	proposerPubkey *types.Pubkey,
+	distributorAddress common.Address,
+) *types.Transaction {
+	polTx := &types.PoLTx{
+		ChainID: chainID,
+		Pubkey:  proposerPubkey,
+		To:      &distributorAddress,
+		Nonce:   0, // TODO(BRIP-4): update this to the actual nonce.
+	}
+
+	return types.NewTx(polTx)
 }
 
 // ValidatePoLTx validates the PoL tx.
-func ValidatePrague1Block(block *types.Block) error {
+func ValidatePrague1Block(block *types.Block, distributorAddress common.Address) error {
 	// Build PoL tx.
-	polTx := BuildPoLTx(block.Number(), block.ProposerPubkey())
+	polTx := BuildPoLTx(block.Number(), block.ProposerPubkey(), distributorAddress)
 	if polTx == nil {
 		return fmt.Errorf("failed to build PoL tx")
 	}

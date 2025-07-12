@@ -17,6 +17,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -90,9 +91,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 
-	// Berachain: validate the prague1 block has PoL tx.
+	// Berachain: validate the prague1 block has PoL tx only as the first tx.
 	if p.config.IsPrague1(block.Number(), block.Time()) {
-		if err := ValidatePrague1Block(block, p.config.Berachain.Prague1.PoLDistributorAddress); err != nil {
+		if err := ValidatePrague1Block(
+			p.config.ChainID, block, p.config.Berachain.Prague1.PoLDistributorAddress,
+		); err != nil {
 			return nil, fmt.Errorf("could not validate prague1 block: %w", err)
 		}
 	}
@@ -108,6 +111,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			// Berachain: for the PoL tx, we don't charge gas from the block.
 			gp = polGP
 			blockGasUsed = new(uint64)
+
+			// TODO(BRIP-4): Use processPoLTx instead of ApplyTransaction.
 		}
 
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
@@ -232,33 +237,22 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm)
 }
 
-// BuildPoLTx builds the PoL tx for a specific block and proposer pubkey.
-func BuildPoLTx(
-	chainID *big.Int,
-	proposerPubkey *types.Pubkey,
-	distributorAddress common.Address,
-) *types.Transaction {
-	polTx := &types.PoLTx{
-		ChainID: chainID,
-		Pubkey:  proposerPubkey,
-		To:      &distributorAddress,
-		Nonce:   0, // TODO(BRIP-4): update this to the actual nonce.
-	}
-
-	return types.NewTx(polTx)
-}
-
-// ValidatePoLTx validates the PoL tx.
-func ValidatePrague1Block(block *types.Block, distributorAddress common.Address) error {
-	// Build PoL tx.
-	polTx := BuildPoLTx(block.Number(), block.ProposerPubkey(), distributorAddress)
-	if polTx == nil {
-		return fmt.Errorf("failed to build PoL tx")
-	}
+// ValidatePrague1Block validates the PoL tx is only the first tx in the block.
+func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddress common.Address) error {
+	// Build the expectedPoL tx.
+	polTx := types.NewPoLTx(chainID, block.ProposerPubkey(), distributorAddress, block.Number())
 
 	// Validate PoL tx is the first tx in the block.
 	if block.Transactions()[0].Hash() != polTx.Hash() {
 		return fmt.Errorf("tx hash mismatch: have %v, want %v", block.Transactions()[0].Hash(), polTx.Hash())
+	}
+
+	// Validate subsequent txs cannot call PoL's `distributeFor`.
+	for _, tx := range block.Transactions()[1:] {
+		if tx.To() != nil && *tx.To() == distributorAddress {
+			return errors.New("subsequent txs cannot call PoL's `distributeFor`")
+		}
+		// TODO(BRIP-4): Enforce the tx.Data() does not contain `distributeFor`.
 	}
 
 	return nil

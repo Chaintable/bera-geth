@@ -322,6 +322,8 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 	if tx.Type() == types.PoLTxType {
 		gasPool = new(core.GasPool).AddGas(params.PoLTxGasLimit)
 		gasUsed = new(uint64)
+
+		// TODO(BRIP-4): Use processPoLTx instead of ApplyTransaction.
 	}
 
 	receipt, err := core.ApplyTransaction(env.evm, gasPool, env.state, env.header, tx, gasUsed)
@@ -469,10 +471,11 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 
 	// Berachain: Post-Prague1, add PoL tx to the block according to BRIP-0004.
 	if miner.chainConfig.IsPrague1(env.header.Number, env.header.Time) {
-		polTx := core.BuildPoLTx(
+		polTx := types.NewPoLTx(
 			miner.chainConfig.ChainID,
 			env.header.ParentProposerPubkey,
 			miner.chainConfig.Berachain.Prague1.PoLDistributorAddress,
+			env.header.Number,
 		)
 		if err := miner.commitTransaction(env, polTx); err != nil {
 			return err

@@ -89,13 +89,37 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 
-	// Berachain: validate the prague1 block has PoL tx only as the first tx.
-	if err := ValidatePrague1Block(p.config, block); err != nil {
-		return nil, fmt.Errorf("could not validate prague1 block: %w", err)
+	// Pre-compute the expected PoL tx hash (only needed if Prague-1 rules apply).
+	isPrague1 := p.config.IsPrague1(block.Number(), block.Time())
+	expectedPoLHash := common.Hash{}
+	if isPrague1 {
+		polTx, err := types.NewPoLTx(
+			p.config.ChainID,
+			p.config.Berachain.Prague1.PoLDistributorAddress,
+			new(big.Int).Sub(block.Number(), big.NewInt(1)),
+			params.PoLTxGasLimit,
+			block.ProposerPubkey(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create expected PoL tx: %w", err)
+		}
+		expectedPoLHash = polTx.Hash()
 	}
 
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
+		// Berachain: validate the PoL tx is only the first tx in the block. // TODO(BRIP-4): unit test.
+		switch {
+		case isPrague1 && i == 0:
+			// The first tx MUST be the (only) PoL tx and must match the expected one.
+			if tx.Hash() != expectedPoLHash {
+				return nil, fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
+			}
+		case types.IsPoLDistribution(tx.To(), tx.Data(), p.config.Berachain.Prague1.PoLDistributorAddress):
+			// Either we are not in Prague-1 or this is not the first tx – both invalid.
+			return nil, fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
+		}
+
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -216,53 +240,6 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 	}
 	// Create a new context to be used in the EVM environment
 	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm)
-}
-
-// Berachain: ValidatePrague1Block validates the PoL tx is only the first tx in the block.
-// TODO(BRIP-4): unit test.
-func ValidatePrague1Block(chainConfig *params.ChainConfig, block *types.Block) error {
-	isPrague1 := chainConfig.IsPrague1(block.Number(), block.Time())
-	blockTxs := block.Transactions()
-	nonPoLTxs := blockTxs
-	if isPrague1 {
-		// In Prague1, the first tx of the block must be the PoL tx, so we skip checking the first.
-		nonPoLTxs = blockTxs[1:]
-	}
-
-	// Validate that non-PoL txs cannot call PoL's `distributeFor`.
-	for i, tx := range nonPoLTxs {
-		if types.IsPoLDistribution(tx.To(), tx.Data(), chainConfig.Berachain.Prague1.PoLDistributorAddress) {
-			txIndex := i
-			if isPrague1 {
-				txIndex += 1
-			}
-			return fmt.Errorf("invalid block: tx at index %d is a PoL tx", txIndex)
-		}
-	}
-
-	// If we're not in Prague1, we're done.
-	if !isPrague1 {
-		return nil
-	}
-
-	// Build the expectedPoL tx according to BRIP-0004.
-	polTx, err := types.NewPoLTx(
-		chainConfig.ChainID,
-		chainConfig.Berachain.Prague1.PoLDistributorAddress,
-		block.ProposerPubkey(),
-		new(big.Int).Sub(block.Number(), big.NewInt(1)),
-		params.PoLTxGasLimit,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create PoL tx: %v", err)
-	}
-
-	// Verify that the first tx in the block is the expected PoL tx.
-	if blockTxs[0].Hash() != polTx.Hash() {
-		return fmt.Errorf("tx hash mismatch: have %v, want %v", blockTxs[0].Hash(), polTx.Hash())
-	}
-
-	return nil
 }
 
 // ProcessBeaconBlockRoot applies the EIP-4788 system call to the beacon block root

@@ -35,18 +35,18 @@ var _ TxData = (*PoLTx)(nil)
 type PoLTx struct {
 	ChainID  *big.Int
 	To       *common.Address // address of the PoL Distributor contract
-	Data     []byte          // encodes the pubkey distributing for
 	Nonce    uint64          // block number distributing for
 	GasLimit uint64          // artificial gas limit for the PoL tx, not consumed against the block gas limit
+	Data     []byte          // encodes the pubkey distributing for
 }
 
 // NewPoLTx creates a new PoL transaction.
 func NewPoLTx(
 	chainID *big.Int,
 	distributorAddress common.Address,
-	pubkey *Pubkey,
 	blockNumber *big.Int,
 	gasLimit uint64,
+	pubkey *Pubkey,
 ) (*Transaction, error) {
 	data, err := getDistributeForData(pubkey)
 	if err != nil {
@@ -55,9 +55,9 @@ func NewPoLTx(
 	return NewTx(&PoLTx{
 		ChainID:  chainID,
 		To:       &distributorAddress,
-		Data:     data,
 		Nonce:    blockNumber.Uint64(),
 		GasLimit: gasLimit,
+		Data:     data,
 	}), nil
 }
 
@@ -118,9 +118,9 @@ func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 			chainID,              // chainID: EIP-155 chain ID
 			params.SystemAddress, // from = system address
 			tx.To,                // to = address of the PoL Distributor contract
-			tx.Data,              // data ~= pubkey distributing for
 			tx.Nonce,             // nonce = block number distributing for
 			tx.GasLimit,          // gasLimit = artificial gas limit for execution
+			tx.Data,              // data ~= pubkey distributing for
 		})
 }
 

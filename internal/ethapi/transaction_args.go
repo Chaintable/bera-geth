@@ -463,11 +463,13 @@ func (args *TransactionArgs) ToMessage(baseFee *big.Int, skipNonceCheck, skipEoA
 		SetCodeAuthorizations: args.AuthorizationList,
 		SkipNonceChecks:       skipNonceCheck,
 		SkipFromEOACheck:      skipEoACheck,
+		IsPoLTx:               false, // TODO(BRIP-4): set to true if PoL tx.
 	}
 }
 
 // ToTransaction converts the arguments to a transaction.
 // This assumes that setDefaults has been called.
+// TODO(BRIP-4): add PoL tx type and determination.
 func (args *TransactionArgs) ToTransaction(defaultType int) *types.Transaction {
 	usedType := types.LegacyTxType
 	switch {

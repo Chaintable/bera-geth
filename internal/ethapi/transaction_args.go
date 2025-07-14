@@ -492,7 +492,7 @@ func (args *TransactionArgs) ToTransaction(defaultType int, distributorAddress c
 	case types.PoLTxType:
 		data = &types.PoLTx{
 			ChainID:  (*big.Int)(args.ChainID),
-			To:       args.To,
+			To:       *args.To,
 			Data:     args.data(),
 			Nonce:    uint64(*args.Nonce),
 			GasLimit: uint64(*args.Gas),

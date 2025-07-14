@@ -226,7 +226,7 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 // Berachain: ValidatePrague1Block validates the PoL tx is only the first tx in the block.
 func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddress common.Address) error {
 	// Build the expectedPoL tx according to BRIP-0004.
-	polTx := types.NewPoLTx(
+	polTx, err := types.NewPoLTx(
 		chainID,
 		params.SystemAddress,
 		distributorAddress,
@@ -234,6 +234,9 @@ func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddre
 		block.Number(),
 		params.PoLTxGasLimit,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create PoL tx: %v", err)
+	}
 
 	// Validate PoL tx is the first tx in the block.
 	if block.Transactions()[0].Hash() != polTx.Hash() {

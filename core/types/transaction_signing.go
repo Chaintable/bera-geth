@@ -259,7 +259,7 @@ func (s *modernSigner) Sender(tx *Transaction) (common.Address, error) {
 		return common.Address{}, fmt.Errorf("%w: have %d want %d", ErrInvalidChainId, tx.ChainId(), s.chainID)
 	}
 
-	// Berachain specific: PoLTx is system-signed and carries no signature.
+	// Berachain specific: PoLTx is sent by system address and carries no signature.
 	if tt == PoLTxType {
 		return params.SystemAddress, nil
 	}

@@ -22,19 +22,43 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // PoLTx implements the TxData interface.
 var _ TxData = (*PoLTx)(nil)
 
-// PoLTx represents an BRIP-0004 transaction.
+// PoLTx represents an BRIP-0004 transaction. No gas is consumed for execution.
 type PoLTx struct {
-	ChainID     *big.Int
-	Pubkey      *Pubkey
-	To          *common.Address // address of the PoL Distributor contract.
-	BlockNumber uint64
+	ChainID  *big.Int
+	From     *common.Address // should be the system address
+	To       *common.Address // address of the PoL Distributor contract
+	Data     []byte          // encodes the pubkey distributing for
+	Nonce    uint64          // block number distributing for
+	GasLimit uint64          // artificial gas limit for the PoL tx, not consumed against the block gas limit
+}
+
+// NewPoLTx creates a new PoL transaction.
+func NewPoLTx(
+	chainID *big.Int,
+	from common.Address,
+	distributorAddress common.Address,
+	pubkey *Pubkey,
+	blockNumber *big.Int,
+	gasLimit uint64,
+) (*Transaction, error) {
+	data, err := getDistributeForData(pubkey)
+	if err != nil {
+		return nil, err
+	}
+	return NewTx(&PoLTx{
+		ChainID:  chainID,
+		From:     &from,
+		To:       &distributorAddress,
+		Data:     data,
+		Nonce:    blockNumber.Uint64(),
+		GasLimit: gasLimit,
+	}), nil
 }
 
 func (*PoLTx) txType() byte { return PoLTxType }
@@ -42,10 +66,12 @@ func (*PoLTx) txType() byte { return PoLTxType }
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *PoLTx) copy() TxData {
 	cpy := &PoLTx{
-		ChainID:     new(big.Int),
-		Pubkey:      copyPubkeyPtr(tx.Pubkey),
-		To:          copyAddressPtr(tx.To),
-		BlockNumber: tx.BlockNumber,
+		ChainID:  new(big.Int),
+		From:     copyAddressPtr(tx.From),
+		To:       copyAddressPtr(tx.To),
+		Data:     common.CopyBytes(tx.Data),
+		Nonce:    tx.Nonce,
+		GasLimit: tx.GasLimit,
 	}
 	if tx.ChainID != nil {
 		cpy.ChainID.Set(tx.ChainID)
@@ -55,13 +81,13 @@ func (tx *PoLTx) copy() TxData {
 
 func (tx *PoLTx) chainID() *big.Int   { return tx.ChainID }
 func (*PoLTx) accessList() AccessList { return nil }
-func (tx *PoLTx) data() []byte        { return mustGetDistributeForData(tx.Pubkey) }
-func (*PoLTx) gas() uint64            { return params.PoLTxGasLimit }
+func (tx *PoLTx) data() []byte        { return tx.Data }
+func (tx *PoLTx) gas() uint64         { return tx.GasLimit }
 func (*PoLTx) gasPrice() *big.Int     { return new(big.Int) }
 func (*PoLTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) value() *big.Int        { return new(big.Int) }
-func (tx *PoLTx) nonce() uint64       { return tx.BlockNumber }
+func (tx *PoLTx) nonce() uint64       { return tx.Nonce }
 func (tx *PoLTx) to() *common.Address { return tx.To }
 
 // No-op: PoLTx is system-signed and carries no signature.
@@ -88,34 +114,27 @@ func (tx *PoLTx) decode(input []byte) error {
 
 func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 	return prefixedRlpHash(
-		PoLTxType,
+		PoLTxType, // tx type: 0x7D
 		[]any{
-			chainID,              // chainID: EIP-155 chain ID
-			params.SystemAddress, // from: system address
-			tx.To,                // to: address of the PoL Distributor contract.
-			tx.Pubkey,            // pubkey distributing for
-			tx.BlockNumber,       // nonce: block number being distributed for
+			chainID,     // chainID: EIP-155 chain ID
+			tx.From,     // from = system address
+			tx.To,       // to = address of the PoL Distributor contract
+			tx.Data,     // data ~= pubkey distributing for
+			tx.Nonce,    // nonce = block number distributing for
+			tx.GasLimit, // gasLimit = artificial gas limit for execution
 		})
 }
 
-// mustGetDistributeForData returns the tx data for the distributeFor method.
-func mustGetDistributeForData(pubkey *Pubkey) []byte {
-	bytesT, err := abi.NewType("bytes", "", nil)
-	if err != nil {
-		// NOTE: this should never happen.
-		panic(err)
-	}
-
-	distributeForMethod := abi.NewMethod(
+var (
+	bytesType, _        = abi.NewType("bytes", "", nil)
+	distributeForMethod = abi.NewMethod(
 		"distributeFor", "distributeFor", abi.Function, "nonpayable", false, false, []abi.Argument{
-			{Name: "pubkey", Type: bytesT, Indexed: false},
+			{Name: "pubkey", Type: bytesType, Indexed: false},
 		}, nil,
 	)
+)
 
-	data, err := distributeForMethod.Inputs.Pack(pubkey)
-	if err != nil {
-		// NOTE: this should never happen.
-		panic(err)
-	}
-	return data
+// getDistributeForData returns the tx data for the distributeFor method.
+func getDistributeForData(pubkey *Pubkey) ([]byte, error) {
+	return distributeForMethod.Inputs.Pack(pubkey)
 }

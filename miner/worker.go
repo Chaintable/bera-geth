@@ -313,18 +313,8 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 	var (
 		snap = env.state.Snapshot()
 		gp   = env.gasPool.Gas()
-
-		gasPool = env.gasPool
-		gasUsed = &env.header.GasUsed
 	)
-
-	// Berachain: PoL txs do not count towards block gas.
-	if tx.Type() == types.PoLTxType {
-		gasPool = new(core.GasPool).AddGas(params.PoLTxGasLimit)
-		gasUsed = new(uint64)
-	}
-
-	receipt, err := core.ApplyTransaction(env.evm, gasPool, env.state, env.header, tx, gasUsed)
+	receipt, err := core.ApplyTransaction(env.evm, env.gasPool, env.state, env.header, tx, &env.header.GasUsed)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
@@ -469,9 +459,18 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 
 	// Berachain: Post-Prague1, add PoL tx to the block according to BRIP-0004.
 	if miner.chainConfig.IsPrague1(env.header.Number, env.header.Time) {
-		if err := miner.commitTransaction(
-			env, core.BuildPoLTx(env.header.Number, env.header.ParentProposerPubkey),
-		); err != nil {
+		polTx, err := types.NewPoLTx(
+			miner.chainConfig.ChainID,
+			params.SystemAddress,
+			miner.chainConfig.Berachain.Prague1.PoLDistributorAddress,
+			env.header.ParentProposerPubkey,
+			env.header.Number,
+			params.PoLTxGasLimit,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create PoL tx: %v", err)
+		}
+		if err = miner.commitTransaction(env, polTx); err != nil {
 			return err
 		}
 	}

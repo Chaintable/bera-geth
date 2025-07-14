@@ -17,6 +17,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -62,8 +63,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		blockHash   = block.Hash()
 		blockNumber = block.Number()
 		allLogs     []*types.Log
-		blockGP     = new(GasPool).AddGas(block.GasLimit())
-		polGP       = new(GasPool).AddGas(params.PoLTxGasLimit) // Berachain specific: PoL tx has a gas limit of 100M
+		gp          = new(GasPool).AddGas(block.GasLimit())
 	)
 
 	// Mutate the block and state according to any hard-fork specs
@@ -90,26 +90,17 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 
-	// Berachain: validate the prague1 block has PoL tx.
+	// Berachain: validate the prague1 block has PoL tx only as the first tx.
 	if p.config.IsPrague1(block.Number(), block.Time()) {
-		if err := ValidatePrague1Block(block); err != nil {
+		if err := ValidatePrague1Block(
+			p.config.ChainID, block, p.config.Berachain.Prague1.PoLDistributorAddress,
+		); err != nil {
 			return nil, fmt.Errorf("could not validate prague1 block: %w", err)
 		}
 	}
 
-	var (
-		gp           = blockGP
-		blockGasUsed = usedGas
-	)
-
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
-		if i == 0 && p.config.IsPrague1(block.Number(), block.Time()) {
-			// Berachain: for the PoL tx, we don't charge gas from the block.
-			gp = polGP
-			blockGasUsed = new(uint64)
-		}
-
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -117,7 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 		statedb.SetTxContext(tx.Hash(), i)
 
-		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, blockGasUsed, evm)
+		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, usedGas, evm)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
@@ -232,23 +223,32 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm)
 }
 
-// BuildPoLTx builds the PoL tx for a specific block and proposer pubkey.
-func BuildPoLTx(blockNumber *big.Int, proposerPubkey *types.Pubkey) *types.Transaction {
-	// TODO(BRIP-4): implement.
-	return nil
-}
-
-// ValidatePoLTx validates the PoL tx.
-func ValidatePrague1Block(block *types.Block) error {
-	// Build PoL tx.
-	polTx := BuildPoLTx(block.Number(), block.ProposerPubkey())
-	if polTx == nil {
-		return fmt.Errorf("failed to build PoL tx")
+// Berachain: ValidatePrague1Block validates the PoL tx is only the first tx in the block.
+func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddress common.Address) error {
+	// Build the expectedPoL tx according to BRIP-0004.
+	polTx, err := types.NewPoLTx(
+		chainID,
+		params.SystemAddress,
+		distributorAddress,
+		block.ProposerPubkey(),
+		block.Number(),
+		params.PoLTxGasLimit,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create PoL tx: %v", err)
 	}
 
 	// Validate PoL tx is the first tx in the block.
 	if block.Transactions()[0].Hash() != polTx.Hash() {
 		return fmt.Errorf("tx hash mismatch: have %v, want %v", block.Transactions()[0].Hash(), polTx.Hash())
+	}
+
+	// Validate subsequent txs cannot call PoL's `distributeFor`.
+	for _, tx := range block.Transactions()[1:] {
+		if tx.To() != nil && *tx.To() == distributorAddress {
+			return errors.New("subsequent txs cannot call PoL's `distributeFor`")
+		}
+		// TODO(BRIP-4): Enforce the tx.Data() does not contain `distributeFor`.
 	}
 
 	return nil

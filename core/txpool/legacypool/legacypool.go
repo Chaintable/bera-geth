@@ -290,6 +290,11 @@ func New(config Config, chain BlockChain) *LegacyPool {
 // Filter returns whether the given transaction can be consumed by the legacy
 // pool, specifically, whether it is a Legacy, AccessList or Dynamic transaction.
 func (pool *LegacyPool) Filter(tx *types.Transaction) bool {
+	// Berachain: transactions to PoL's distributeFor are rejected.
+	if types.IsPoLDistribution(tx.To(), tx.Data(), pool.chainconfig.Berachain.Prague1.PoLDistributorAddress) {
+		return false
+	}
+
 	switch tx.Type() {
 	case types.LegacyTxType, types.AccessListTxType, types.DynamicFeeTxType, types.SetCodeTxType:
 		return true

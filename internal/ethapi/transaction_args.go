@@ -493,9 +493,9 @@ func (args *TransactionArgs) ToTransaction(defaultType int, distributorAddress c
 		data = &types.PoLTx{
 			ChainID:  (*big.Int)(args.ChainID),
 			To:       *args.To,
-			Data:     args.data(),
 			Nonce:    uint64(*args.Nonce),
 			GasLimit: uint64(*args.Gas),
+			Data:     args.data(),
 		}
 	case types.SetCodeTxType:
 		al := types.AccessList{}

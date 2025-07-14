@@ -89,13 +89,13 @@ func (*PoLTx) value() *big.Int        { return new(big.Int) }
 func (tx *PoLTx) nonce() uint64       { return tx.Nonce }
 func (tx *PoLTx) to() *common.Address { return &tx.To }
 
-// No-op: PoLTx is system-signed and carries no signature.
+// No-op: PoLTx is originated from the system address and carries no signature.
 func (*PoLTx) rawSignatureValues() (v, r, s *big.Int) {
 	return nil, nil, nil
 }
 
 func (*PoLTx) setSignatureValues(chainID, v, r, s *big.Int) {
-	// No-op: PoLTx is system-signed and carries no signature.
+	// No-op: PoLTx is originated from the system address and carries no signature.
 }
 
 // effectiveGasPrice is a no-op for PoLTx. PoLTx does not pay for gas.

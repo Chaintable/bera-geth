@@ -313,20 +313,8 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 	var (
 		snap = env.state.Snapshot()
 		gp   = env.gasPool.Gas()
-
-		gasPool = env.gasPool
-		gasUsed = &env.header.GasUsed
 	)
-
-	// Berachain: PoL txs do not count towards block gas.
-	if tx.Type() == types.PoLTxType {
-		gasPool = new(core.GasPool).AddGas(params.PoLTxGasLimit)
-		gasUsed = new(uint64)
-
-		// TODO(BRIP-4): Use processPoLTx instead of ApplyTransaction.
-	}
-
-	receipt, err := core.ApplyTransaction(env.evm, gasPool, env.state, env.header, tx, gasUsed)
+	receipt, err := core.ApplyTransaction(env.evm, env.gasPool, env.state, env.header, tx, &env.header.GasUsed)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
@@ -473,9 +461,11 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	if miner.chainConfig.IsPrague1(env.header.Number, env.header.Time) {
 		polTx := types.NewPoLTx(
 			miner.chainConfig.ChainID,
-			env.header.ParentProposerPubkey,
+			params.SystemAddress,
 			miner.chainConfig.Berachain.Prague1.PoLDistributorAddress,
+			env.header.ParentProposerPubkey,
 			env.header.Number,
+			params.PoLTxGasLimit,
 		)
 		if err := miner.commitTransaction(env, polTx); err != nil {
 			return err

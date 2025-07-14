@@ -63,8 +63,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		blockHash   = block.Hash()
 		blockNumber = block.Number()
 		allLogs     []*types.Log
-		blockGP     = new(GasPool).AddGas(block.GasLimit())
-		polGP       = new(GasPool).AddGas(params.PoLTxGasLimit) // Berachain specific: PoL tx has a gas limit of 100M
+		gp          = new(GasPool).AddGas(block.GasLimit())
 	)
 
 	// Mutate the block and state according to any hard-fork specs
@@ -100,21 +99,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 	}
 
-	var (
-		gp           = blockGP
-		blockGasUsed = usedGas
-	)
-
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
-		if i == 0 && p.config.IsPrague1(block.Number(), block.Time()) {
-			// Berachain: for the PoL tx, we don't charge gas from the block.
-			gp = polGP
-			blockGasUsed = new(uint64)
-
-			// TODO(BRIP-4): Use processPoLTx instead of ApplyTransaction.
-		}
-
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -122,7 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 		statedb.SetTxContext(tx.Hash(), i)
 
-		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, blockGasUsed, evm)
+		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, usedGas, evm)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
@@ -237,10 +223,17 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm)
 }
 
-// ValidatePrague1Block validates the PoL tx is only the first tx in the block.
+// Berachain: ValidatePrague1Block validates the PoL tx is only the first tx in the block.
 func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddress common.Address) error {
-	// Build the expectedPoL tx.
-	polTx := types.NewPoLTx(chainID, block.ProposerPubkey(), distributorAddress, block.Number())
+	// Build the expectedPoL tx according to BRIP-0004.
+	polTx := types.NewPoLTx(
+		chainID,
+		params.SystemAddress,
+		distributorAddress,
+		block.ProposerPubkey(),
+		block.Number(),
+		params.PoLTxGasLimit,
+	)
 
 	// Validate PoL tx is the first tx in the block.
 	if block.Transactions()[0].Hash() != polTx.Hash() {

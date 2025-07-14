@@ -22,33 +22,38 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // PoLTx implements the TxData interface.
 var _ TxData = (*PoLTx)(nil)
 
-// PoLTx represents an BRIP-0004 transaction.
+// PoLTx represents an BRIP-0004 transaction. No gas is consumed for execution.
 type PoLTx struct {
-	ChainID     *big.Int
-	Pubkey      *Pubkey
-	To          *common.Address // address of the PoL Distributor contract.
-	BlockNumber uint64
+	ChainID            *big.Int
+	From               *common.Address // should be the system address --> sender
+	DistributorAddress *common.Address // address of the PoL Distributor contract --> to
+	Pubkey             *Pubkey         // pubkey distributing for --> data
+	BlockNumber        uint64          // block number distributing for --> nonce
+	GasLimit           uint64          // artificial gas limit for the PoL tx --> gas
 }
 
 // NewPoLTx creates a new PoL transaction.
 func NewPoLTx(
 	chainID *big.Int,
-	proposerPubkey *Pubkey,
+	from common.Address,
 	distributorAddress common.Address,
+	pubkey *Pubkey,
 	blockNumber *big.Int,
+	gasLimit uint64,
 ) *Transaction {
 	return NewTx(&PoLTx{
-		ChainID:     chainID,
-		Pubkey:      proposerPubkey,
-		To:          &distributorAddress,
-		BlockNumber: blockNumber.Uint64(),
+		ChainID:            chainID,
+		From:               &from,
+		DistributorAddress: &distributorAddress,
+		Pubkey:             pubkey,
+		BlockNumber:        blockNumber.Uint64(),
+		GasLimit:           gasLimit,
 	})
 }
 
@@ -57,10 +62,12 @@ func (*PoLTx) txType() byte { return PoLTxType }
 // copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *PoLTx) copy() TxData {
 	cpy := &PoLTx{
-		ChainID:     new(big.Int),
-		Pubkey:      copyPubkeyPtr(tx.Pubkey),
-		To:          copyAddressPtr(tx.To),
-		BlockNumber: tx.BlockNumber,
+		ChainID:            new(big.Int),
+		From:               copyAddressPtr(tx.From),
+		DistributorAddress: copyAddressPtr(tx.DistributorAddress),
+		Pubkey:             copyPubkeyPtr(tx.Pubkey),
+		BlockNumber:        tx.BlockNumber,
+		GasLimit:           tx.GasLimit,
 	}
 	if tx.ChainID != nil {
 		cpy.ChainID.Set(tx.ChainID)
@@ -71,13 +78,13 @@ func (tx *PoLTx) copy() TxData {
 func (tx *PoLTx) chainID() *big.Int   { return tx.ChainID }
 func (*PoLTx) accessList() AccessList { return nil }
 func (tx *PoLTx) data() []byte        { return mustGetDistributeForData(tx.Pubkey) }
-func (*PoLTx) gas() uint64            { return params.PoLTxGasLimit }
+func (tx *PoLTx) gas() uint64         { return tx.GasLimit }
 func (*PoLTx) gasPrice() *big.Int     { return new(big.Int) }
 func (*PoLTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) value() *big.Int        { return new(big.Int) }
 func (tx *PoLTx) nonce() uint64       { return tx.BlockNumber }
-func (tx *PoLTx) to() *common.Address { return tx.To }
+func (tx *PoLTx) to() *common.Address { return tx.DistributorAddress }
 
 // No-op: PoLTx is system-signed and carries no signature.
 func (*PoLTx) rawSignatureValues() (v, r, s *big.Int) {
@@ -103,13 +110,14 @@ func (tx *PoLTx) decode(input []byte) error {
 
 func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 	return prefixedRlpHash(
-		PoLTxType,
+		PoLTxType, // tx type: 0x7D
 		[]any{
-			chainID,              // chainID: EIP-155 chain ID
-			params.SystemAddress, // from: system address
-			tx.To,                // to: address of the PoL Distributor contract.
-			tx.Pubkey,            // pubkey distributing for
-			tx.BlockNumber,       // nonce: block number distributing for
+			chainID,               // chainID: EIP-155 chain ID
+			tx.From,               // from = system address
+			tx.DistributorAddress, // to = address of the PoL Distributor contract
+			tx.Pubkey,             // data ~= pubkey distributing for
+			tx.BlockNumber,        // nonce = block number distributing for
+			tx.GasLimit,           // gasLimit = artificial gas limit for execution
 		})
 }
 

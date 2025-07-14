@@ -90,12 +90,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 
 	// Berachain: validate the prague1 block has PoL tx only as the first tx.
-	if p.config.IsPrague1(block.Number(), block.Time()) {
-		if err := ValidatePrague1Block(
-			p.config.ChainID, block, p.config.Berachain.Prague1.PoLDistributorAddress,
-		); err != nil {
-			return nil, fmt.Errorf("could not validate prague1 block: %w", err)
-		}
+	if err := ValidatePrague1Block(p.config, block); err != nil {
+		return nil, fmt.Errorf("could not validate prague1 block: %w", err)
 	}
 
 	// Iterate over and process the individual transactions
@@ -223,11 +219,36 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 }
 
 // Berachain: ValidatePrague1Block validates the PoL tx is only the first tx in the block.
-func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddress common.Address) error {
+// TODO(BRIP-4): unit test.
+func ValidatePrague1Block(chainConfig *params.ChainConfig, block *types.Block) error {
+	isPrague1 := chainConfig.IsPrague1(block.Number(), block.Time())
+	blockTxs := block.Transactions()
+	nonPoLTxs := blockTxs
+	if isPrague1 {
+		// In Prague1, the first tx of the block must be the PoL tx, so we skip checking the first.
+		nonPoLTxs = blockTxs[1:]
+	}
+
+	// Validate that non-PoL txs cannot call PoL's `distributeFor`.
+	for i, tx := range nonPoLTxs {
+		if types.IsPoLDistribution(tx.To(), tx.Data(), chainConfig.Berachain.Prague1.PoLDistributorAddress) {
+			txIndex := i
+			if isPrague1 {
+				txIndex += 1
+			}
+			return fmt.Errorf("invalid block: tx at index %d is a PoL tx", txIndex)
+		}
+	}
+
+	// If we're not in Prague1, we're done.
+	if !isPrague1 {
+		return nil
+	}
+
 	// Build the expectedPoL tx according to BRIP-0004.
 	polTx, err := types.NewPoLTx(
-		chainID,
-		distributorAddress,
+		chainConfig.ChainID,
+		chainConfig.Berachain.Prague1.PoLDistributorAddress,
 		block.ProposerPubkey(),
 		new(big.Int).Sub(block.Number(), big.NewInt(1)),
 		params.PoLTxGasLimit,
@@ -236,16 +257,9 @@ func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddre
 		return fmt.Errorf("failed to create PoL tx: %v", err)
 	}
 
-	// Validate PoL tx is the first tx in the block.
-	if block.Transactions()[0].Hash() != polTx.Hash() {
-		return fmt.Errorf("tx hash mismatch: have %v, want %v", block.Transactions()[0].Hash(), polTx.Hash())
-	}
-
-	// Validate subsequent txs cannot call PoL's `distributeFor`.
-	for i, tx := range block.Transactions()[1:] {
-		if types.IsPoLDistribution(tx.To(), tx.Data(), distributorAddress) {
-			return fmt.Errorf("invalid Prague1 block: tx index %d is a PoL tx", i+1)
-		}
+	// Verify that the first tx in the block is the expected PoL tx.
+	if blockTxs[0].Hash() != polTx.Hash() {
+		return fmt.Errorf("tx hash mismatch: have %v, want %v", blockTxs[0].Hash(), polTx.Hash())
 	}
 
 	return nil

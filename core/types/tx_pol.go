@@ -68,9 +68,9 @@ func (tx *PoLTx) copy() TxData {
 	cpy := &PoLTx{
 		ChainID:  new(big.Int),
 		To:       copyAddressPtr(tx.To),
-		Data:     common.CopyBytes(tx.Data),
 		Nonce:    tx.Nonce,
 		GasLimit: tx.GasLimit,
+		Data:     common.CopyBytes(tx.Data),
 	}
 	if tx.ChainID != nil {
 		cpy.ChainID.Set(tx.ChainID)

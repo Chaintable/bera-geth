@@ -75,12 +75,3 @@ func (p *Pubkey) UnmarshalJSON(input []byte) error {
 	}
 	return p.UnmarshalText([]byte(s))
 }
-
-// copyPubkeyPtr copies a pubkey.
-func copyPubkeyPtr(p *Pubkey) *Pubkey {
-	if p == nil {
-		return nil
-	}
-	cpy := *p
-	return &cpy
-}

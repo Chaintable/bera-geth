@@ -971,9 +971,10 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 		return nil, err
 	}
 	var (
-		msg         = args.ToMessage(vmctx.BaseFee, true, true)
-		tx          = args.ToTransaction(types.LegacyTxType)
-		traceConfig *TraceConfig
+		distributorAddress = api.backend.ChainConfig().Berachain.Prague1.PoLDistributorAddress
+		msg                = args.ToMessage(vmctx.BaseFee, true, true, distributorAddress)
+		tx                 = args.ToTransaction(types.LegacyTxType, distributorAddress)
+		traceConfig        *TraceConfig
 	)
 	// Lower the basefee to 0 to avoid breaking EVM
 	// invariants (basefee < feecap).

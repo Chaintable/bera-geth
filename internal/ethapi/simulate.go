@@ -280,7 +280,7 @@ func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header,
 			return nil, nil, nil, err
 		}
 		var (
-			tx     = call.ToTransaction(types.DynamicFeeTxType)
+			tx     = call.ToTransaction(types.DynamicFeeTxType, sim.chainConfig.Berachain.Prague1.PoLDistributorAddress)
 			txHash = tx.Hash()
 		)
 		txes[i] = tx
@@ -288,7 +288,7 @@ func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header,
 		tracer.reset(txHash, uint(i))
 		sim.state.SetTxContext(txHash, i)
 		// EoA check is always skipped, even in validation mode.
-		msg := call.ToMessage(header.BaseFee, !sim.validate, true)
+		msg := call.ToMessage(header.BaseFee, !sim.validate, true, sim.chainConfig.Berachain.Prague1.PoLDistributorAddress)
 		result, err := applyMessageWithEVM(ctx, evm, msg, timeout, sim.gp)
 		if err != nil {
 			txErr := txValidationError(err)

@@ -414,7 +414,7 @@ func (args *TransactionArgs) CallDefaults(globalGasCap uint64, baseFee *big.Int,
 // core evm. This method is used in calls and traces that do not require a real
 // live transaction.
 // Assumes that fields are not nil, i.e. setDefaults or CallDefaults has been called.
-func (args *TransactionArgs) ToMessage(baseFee *big.Int, skipNonceCheck, skipEoACheck bool) *core.Message {
+func (args *TransactionArgs) ToMessage(baseFee *big.Int, skipNonceCheck, skipEoACheck bool, distributorAddress common.Address) *core.Message {
 	var (
 		gasPrice  *big.Int
 		gasFeeCap *big.Int
@@ -463,16 +463,17 @@ func (args *TransactionArgs) ToMessage(baseFee *big.Int, skipNonceCheck, skipEoA
 		SetCodeAuthorizations: args.AuthorizationList,
 		SkipNonceChecks:       skipNonceCheck,
 		SkipFromEOACheck:      skipEoACheck,
-		IsPoLTx:               false, // TODO(BRIP-4): set to true if PoL tx.
+		IsPoLTx:               types.IsPoLDistribution(args.To, args.data(), distributorAddress),
 	}
 }
 
 // ToTransaction converts the arguments to a transaction.
 // This assumes that setDefaults has been called.
-// TODO(BRIP-4): add PoL tx type and determination.
-func (args *TransactionArgs) ToTransaction(defaultType int) *types.Transaction {
+func (args *TransactionArgs) ToTransaction(defaultType int, distributorAddress common.Address) *types.Transaction {
 	usedType := types.LegacyTxType
 	switch {
+	case types.IsPoLDistribution(args.To, args.data(), distributorAddress):
+		usedType = types.PoLTxType
 	case args.AuthorizationList != nil || defaultType == types.SetCodeTxType:
 		usedType = types.SetCodeTxType
 	case args.BlobHashes != nil || defaultType == types.BlobTxType:
@@ -488,6 +489,14 @@ func (args *TransactionArgs) ToTransaction(defaultType int) *types.Transaction {
 	}
 	var data types.TxData
 	switch usedType {
+	case types.PoLTxType:
+		data = &types.PoLTx{
+			ChainID:  (*big.Int)(args.ChainID),
+			To:       args.To,
+			Data:     args.data(),
+			Nonce:    uint64(*args.Nonce),
+			GasLimit: uint64(*args.Gas),
+		}
 	case types.SetCodeTxType:
 		al := types.AccessList{}
 		if args.AccessList != nil {

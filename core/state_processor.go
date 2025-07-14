@@ -17,7 +17,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -228,10 +227,9 @@ func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddre
 	// Build the expectedPoL tx according to BRIP-0004.
 	polTx, err := types.NewPoLTx(
 		chainID,
-		params.SystemAddress,
 		distributorAddress,
 		block.ProposerPubkey(),
-		block.Number(),
+		new(big.Int).Sub(block.Number(), big.NewInt(1)),
 		params.PoLTxGasLimit,
 	)
 	if err != nil {
@@ -244,11 +242,10 @@ func ValidatePrague1Block(chainID *big.Int, block *types.Block, distributorAddre
 	}
 
 	// Validate subsequent txs cannot call PoL's `distributeFor`.
-	for _, tx := range block.Transactions()[1:] {
-		if tx.To() != nil && *tx.To() == distributorAddress {
-			return errors.New("subsequent txs cannot call PoL's `distributeFor`")
+	for i, tx := range block.Transactions()[1:] {
+		if types.IsPoLDistribution(tx.To(), tx.Data(), distributorAddress) {
+			return fmt.Errorf("invalid Prague1 block: tx index %d is a PoL tx", i+1)
 		}
-		// TODO(BRIP-4): Enforce the tx.Data() does not contain `distributeFor`.
 	}
 
 	return nil

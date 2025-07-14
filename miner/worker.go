@@ -461,10 +461,9 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	if miner.chainConfig.IsPrague1(env.header.Number, env.header.Time) {
 		polTx, err := types.NewPoLTx(
 			miner.chainConfig.ChainID,
-			params.SystemAddress,
 			miner.chainConfig.Berachain.Prague1.PoLDistributorAddress,
 			env.header.ParentProposerPubkey,
-			env.header.Number,
+			new(big.Int).Sub(env.header.Number, big.NewInt(1)),
 			params.PoLTxGasLimit,
 		)
 		if err != nil {

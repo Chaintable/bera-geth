@@ -22,8 +22,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
+
+// TODO(BRIP-4): unit test.
 
 // PoLTx implements the TxData interface.
 var _ TxData = (*PoLTx)(nil)
@@ -31,7 +34,6 @@ var _ TxData = (*PoLTx)(nil)
 // PoLTx represents an BRIP-0004 transaction. No gas is consumed for execution.
 type PoLTx struct {
 	ChainID  *big.Int
-	From     *common.Address // should be the system address
 	To       *common.Address // address of the PoL Distributor contract
 	Data     []byte          // encodes the pubkey distributing for
 	Nonce    uint64          // block number distributing for
@@ -41,7 +43,6 @@ type PoLTx struct {
 // NewPoLTx creates a new PoL transaction.
 func NewPoLTx(
 	chainID *big.Int,
-	from common.Address,
 	distributorAddress common.Address,
 	pubkey *Pubkey,
 	blockNumber *big.Int,
@@ -53,7 +54,6 @@ func NewPoLTx(
 	}
 	return NewTx(&PoLTx{
 		ChainID:  chainID,
-		From:     &from,
 		To:       &distributorAddress,
 		Data:     data,
 		Nonce:    blockNumber.Uint64(),
@@ -67,7 +67,6 @@ func (*PoLTx) txType() byte { return PoLTxType }
 func (tx *PoLTx) copy() TxData {
 	cpy := &PoLTx{
 		ChainID:  new(big.Int),
-		From:     copyAddressPtr(tx.From),
 		To:       copyAddressPtr(tx.To),
 		Data:     common.CopyBytes(tx.Data),
 		Nonce:    tx.Nonce,
@@ -116,12 +115,12 @@ func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 	return prefixedRlpHash(
 		PoLTxType, // tx type: 0x7D
 		[]any{
-			chainID,     // chainID: EIP-155 chain ID
-			tx.From,     // from = system address
-			tx.To,       // to = address of the PoL Distributor contract
-			tx.Data,     // data ~= pubkey distributing for
-			tx.Nonce,    // nonce = block number distributing for
-			tx.GasLimit, // gasLimit = artificial gas limit for execution
+			chainID,              // chainID: EIP-155 chain ID
+			params.SystemAddress, // from = system address
+			tx.To,                // to = address of the PoL Distributor contract
+			tx.Data,              // data ~= pubkey distributing for
+			tx.Nonce,             // nonce = block number distributing for
+			tx.GasLimit,          // gasLimit = artificial gas limit for execution
 		})
 }
 
@@ -134,7 +133,30 @@ var (
 	)
 )
 
-// getDistributeForData returns the tx data for the distributeFor method.
+// getDistributeForData returns the tx data for the `distributeFor(bytes pubkey)` method.
 func getDistributeForData(pubkey *Pubkey) ([]byte, error) {
-	return distributeForMethod.Inputs.Pack(pubkey)
+	arguments, err := distributeForMethod.Inputs.Pack(pubkey)
+	if err != nil {
+		return nil, err
+	}
+	return append(distributeForMethod.ID, arguments...), nil
+}
+
+// isDistributeForCall returns true if the provided calldata corresponds to a
+// call to the `distributeFor(bytes pubkey)` method defined in BRIP-0004.
+//
+// The function checks that the first four bytes (the function selector) match
+// the ID of the `distributeFor` ABI method declared in tx_pol.go.
+func isDistributeForCall(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	return bytes.Equal(data[:4], distributeForMethod.ID)
+}
+
+// IsPoLDistribution returns true if the transaction is a PoL distribution.
+func IsPoLDistribution(to *common.Address, data []byte, distributorAddress common.Address) bool {
+	// Txs that call the `distributeFor(bytes pubkey)` method on the PoL Distributor
+	// contract are also consideredPoL txs.
+	return to != nil && *to == distributorAddress && isDistributeForCall(data)
 }

@@ -89,37 +89,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 
-	// Pre-compute the expected PoL tx hash (only needed if Prague-1 rules apply).
-	isPrague1 := p.config.IsPrague1(block.Number(), block.Time())
-	expectedPoLHash := common.Hash{}
-	if isPrague1 {
-		polTx, err := types.NewPoLTx(
-			p.config.ChainID,
-			p.config.Berachain.Prague1.PoLDistributorAddress,
-			new(big.Int).Sub(block.Number(), big.NewInt(1)),
-			params.PoLTxGasLimit,
-			block.ProposerPubkey(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create expected PoL tx: %w", err)
-		}
-		expectedPoLHash = polTx.Hash()
-	}
-
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
-		// Berachain: validate the PoL tx is only the first tx in the block. // TODO(BRIP-4): unit test.
-		switch {
-		case isPrague1 && i == 0:
-			// The first tx MUST be the (only) PoL tx and must match the expected one.
-			if tx.Hash() != expectedPoLHash {
-				return nil, fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
-			}
-		case types.IsPoLDistribution(tx.To(), tx.Data(), p.config.Berachain.Prague1.PoLDistributorAddress):
-			// Either we are not in Prague-1 or this is not the first tx – both invalid.
-			return nil, fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
-		}
-
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)

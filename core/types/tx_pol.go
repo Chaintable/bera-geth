@@ -26,8 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// TODO(BRIP-4): unit test.
-
 // PoLTx implements the TxData interface.
 var _ TxData = (*PoLTx)(nil)
 
@@ -135,7 +133,7 @@ var (
 
 // getDistributeForData returns the tx data for the `distributeFor(bytes pubkey)` method.
 func getDistributeForData(pubkey *Pubkey) ([]byte, error) {
-	arguments, err := distributeForMethod.Inputs.Pack(pubkey)
+	arguments, err := distributeForMethod.Inputs.Pack(pubkey.Bytes())
 	if err != nil {
 		return nil, err
 	}

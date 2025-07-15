@@ -199,6 +199,7 @@ func (sim *simulator) execute(ctx context.Context, blocks []simBlock) ([]*simBlo
 		if err != nil {
 			return nil, err
 		}
+		// TODO(BRIP-4): Validate Prague1 block rules.
 		headers[bi] = result.Header()
 		results[bi] = &simBlockResult{fullTx: sim.fullTx, chainConfig: sim.chainConfig, Block: result, Calls: callResults, senders: senders}
 		parent = result.Header()
@@ -206,7 +207,6 @@ func (sim *simulator) execute(ctx context.Context, blocks []simBlock) ([]*simBlo
 	return results, nil
 }
 
-// TODO(BRIP-4): Add PoL tx to simulated processing automatically or expect it to be added by the caller.
 func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header, parent *types.Header, headers []*types.Header, timeout time.Duration) (*types.Block, []simCallResult, map[common.Hash]common.Address, error) {
 	// Set header fields that depend only on parent block.
 	// Parent hash is needed for evm.GetHashFn to work.

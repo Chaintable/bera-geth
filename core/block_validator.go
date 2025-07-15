@@ -56,10 +56,6 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		return ErrKnownBlock
 	}
 
-	// -------------------------------------------------------------------
-	// Berachain: Prague-1 PoL transaction validation (single-pass)
-	// -------------------------------------------------------------------
-
 	// Header validity is known at this point. Here we verify that uncles, transactions
 	// and withdrawals given in the block body match the header.
 	header := block.Header()

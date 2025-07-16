@@ -499,24 +499,39 @@ func (b PrettyBytes) TerminalString() string {
 type Pubkey [PubkeyLength]byte
 
 // Bytes returns a copy of the underlying byte slice.
-func (p Pubkey) Bytes() []byte {
-	b := make([]byte, PubkeyLength)
-	copy(b, p[:])
-	return b
-}
-
-// SetBytes sets the address to the value of b.
-// If b is larger than len(a), b will be cropped from the left.
-func (p *Pubkey) SetBytes(b []byte) {
-	if len(b) > len(p) {
-		b = b[len(b)-PubkeyLength:]
-	}
-	copy(p[PubkeyLength-len(b):], b)
-}
+func (p Pubkey) Bytes() []byte { return p[:] }
 
 // String returns the hex-encoded string representation of the pubkey.
-func (p Pubkey) String() string {
-	return hexutil.Encode(p[:])
+func (p Pubkey) String() string { return hexutil.Encode(p[:]) }
+
+// Format implements fmt.Formatter.
+// Pubkey supports the %v, %s, %q, %x, %X and %d format verbs.
+func (p Pubkey) Format(s fmt.State, c rune) {
+	hexb := make([]byte, 2+len(p)*2)
+	copy(hexb, "0x")
+	hex.Encode(hexb[2:], p[:])
+
+	switch c {
+	case 'x', 'X':
+		if !s.Flag('#') {
+			hexb = hexb[2:]
+		}
+		if c == 'X' {
+			hexb = bytes.ToUpper(hexb)
+		}
+		fallthrough
+	case 'v', 's':
+		s.Write(hexb)
+	case 'q':
+		q := []byte{'"'}
+		s.Write(q)
+		s.Write(hexb)
+		s.Write(q)
+	case 'd':
+		fmt.Fprint(s, ([len(p)]byte)(p))
+	default:
+		fmt.Fprintf(s, "%%!%c(pubkey=%x)", c, p)
+	}
 }
 
 // MarshalText encodes the pubkey as a 0x-prefixed hex string.

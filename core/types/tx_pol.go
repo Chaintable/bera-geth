@@ -32,6 +32,7 @@ var _ TxData = (*PoLTx)(nil)
 // PoLTx represents an BRIP-0004 transaction. No gas is consumed for execution.
 type PoLTx struct {
 	ChainID  *big.Int
+	From     common.Address // system address
 	To       common.Address // address of the PoL Distributor contract
 	Nonce    uint64         // block number distributing for
 	GasLimit uint64         // artificial gas limit for the PoL tx, not consumed against the block gas limit
@@ -54,6 +55,7 @@ func NewPoLTx(
 	}
 	return NewTx(&PoLTx{
 		ChainID:  chainID,
+		From:     params.SystemAddress,
 		To:       distributorAddress,
 		Nonce:    distributionBlockNumber.Uint64(),
 		GasLimit: gasLimit,
@@ -68,6 +70,7 @@ func (*PoLTx) txType() byte { return PoLTxType }
 func (tx *PoLTx) copy() TxData {
 	cpy := &PoLTx{
 		ChainID:  new(big.Int),
+		From:     tx.From,
 		To:       tx.To,
 		Nonce:    tx.Nonce,
 		GasLimit: tx.GasLimit,
@@ -88,8 +91,8 @@ func (*PoLTx) accessList() AccessList { return nil }
 func (tx *PoLTx) data() []byte        { return tx.Data }
 func (tx *PoLTx) gas() uint64         { return tx.GasLimit }
 func (tx *PoLTx) gasPrice() *big.Int  { return tx.GasPrice }
-func (*PoLTx) gasTipCap() *big.Int    { return new(big.Int) }
-func (*PoLTx) gasFeeCap() *big.Int    { return new(big.Int) }
+func (tx *PoLTx) gasTipCap() *big.Int { return tx.GasPrice }
+func (tx *PoLTx) gasFeeCap() *big.Int { return tx.GasPrice }
 func (*PoLTx) value() *big.Int        { return new(big.Int) }
 func (tx *PoLTx) nonce() uint64       { return tx.Nonce }
 func (tx *PoLTx) to() *common.Address { return &tx.To }
@@ -103,7 +106,7 @@ func (*PoLTx) setSignatureValues(chainID, v, r, s *big.Int) {
 	// No-op: PoLTx is originated from the system address and carries no signature.
 }
 
-// effectiveGasPrice is a no-op for PoLTx. PoLTx does not pay for gas, but we
+// effectiveGasPrice returns the gas price. PoLTx does not pay for gas, but we
 // return the baseFee here to make the receipt valid for a 1559 tx.
 func (tx *PoLTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
 	return dst.Set(tx.GasPrice)
@@ -121,12 +124,13 @@ func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 	return prefixedRlpHash(
 		PoLTxType, // tx type: 0x7E
 		[]any{
-			chainID,              // chainID: EIP-155 chain ID
-			params.SystemAddress, // from = system address
-			tx.To,                // to = address of the PoL Distributor contract
-			tx.Nonce,             // nonce = block number distributing for
-			tx.GasLimit,          // gasLimit = artificial gas limit for execution
-			tx.Data,              // data ~= pubkey distributing for
+			chainID,     // chainID: EIP-155 chain ID
+			tx.From,     // from = system address
+			tx.To,       // to = address of the PoL Distributor contract
+			tx.Nonce,    // nonce = block number distributing for
+			tx.GasLimit, // gasLimit = artificial gas limit for execution
+			tx.GasPrice, // gasPrice = baseFee to make the tx valid for EIP-1559 rules
+			tx.Data,     // data ~= pubkey distributing for
 		})
 }
 
@@ -141,7 +145,14 @@ var (
 
 // getDistributeForData returns the tx data for the `distributeFor(bytes pubkey)` method.
 func getDistributeForData(pubkey *common.Pubkey) ([]byte, error) {
-	arguments, err := distributeForMethod.Inputs.Pack(pubkey.Bytes())
+	var pubkeyBytes []byte
+	if pubkey == nil {
+		pubkeyBytes = common.Pubkey{}.Bytes()
+	} else {
+		pubkeyBytes = pubkey.Bytes()
+	}
+
+	arguments, err := distributeForMethod.Inputs.Pack(pubkeyBytes)
 	if err != nil {
 		return nil, err
 	}

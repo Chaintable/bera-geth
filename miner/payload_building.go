@@ -240,10 +240,10 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 		timer := time.NewTimer(0)
 		defer timer.Stop()
 
-		// Setup the timer for terminating the process if SECONDS_PER_SLOT (12s in
-		// the Mainnet configuration) have passed since the point in time identified
+		// Setup the timer for terminating the process if SECONDS_PER_SLOT (2s in
+		// the Berachain configuration) have passed since the point in time identified
 		// by the timestamp parameter.
-		endTimer := time.NewTimer(time.Second * 12)
+		endTimer := time.NewTimer(time.Second * 2)
 
 		fullParams := &generateParams{
 			timestamp:      args.Timestamp,

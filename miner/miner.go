@@ -140,6 +140,9 @@ func (miner *Miner) BuildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 
 // getPending retrieves the pending block based on the current head block.
 // The result might be nil if pending generation is failed.
+//
+// Berachain: Note that the correct PoL tx is not included in the pending block as the
+// parent proposer pubkey of the pending block is not made available here.
 func (miner *Miner) getPending() *newPayloadResult {
 	header := miner.chain.CurrentHeader()
 	miner.pendingMu.Lock()
@@ -163,7 +166,7 @@ func (miner *Miner) getPending() *newPayloadResult {
 		random:         common.Hash{},
 		withdrawals:    withdrawal,
 		beaconRoot:     nil,
-		proposerPubkey: nil,
+		proposerPubkey: &common.Pubkey{},
 		noTxs:          false,
 	}, false) // we will never make a witness for a pending block
 	if ret.err != nil {

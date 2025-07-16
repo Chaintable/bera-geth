@@ -226,11 +226,12 @@ func ApplyPoLMessage(msg *Message, evm *vm.EVM) *ExecutionResult {
 	evm.StateDB.AddAddressToAccessList(*msg.To)
 
 	result := &ExecutionResult{}
-	ret, _, err := evm.Call(msg.From, *msg.To, msg.Data, msg.GasLimit, common.U2560)
+	ret, leftOverGas, err := evm.Call(msg.From, *msg.To, msg.Data, msg.GasLimit, common.U2560)
 	if err != nil {
 		result.Err = fmt.Errorf("PoL tx failed to execute: %v", err)
 	}
 	result.ReturnData = ret
+	result.MaxUsedGas = msg.GasLimit - leftOverGas // To inform how much gas was needed to run the msg.
 	return result
 }
 

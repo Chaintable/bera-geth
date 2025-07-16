@@ -35,6 +35,7 @@ type PoLTx struct {
 	To       common.Address // address of the PoL Distributor contract
 	Nonce    uint64         // block number distributing for
 	GasLimit uint64         // artificial gas limit for the PoL tx, not consumed against the block gas limit
+	GasPrice *big.Int       // gas price is set to the baseFee to make the tx valid for EIP-1559 rules
 	Data     []byte         // encodes the pubkey distributing for
 }
 
@@ -42,8 +43,9 @@ type PoLTx struct {
 func NewPoLTx(
 	chainID *big.Int,
 	distributorAddress common.Address,
-	blockNumber *big.Int,
+	distributionBlockNumber *big.Int,
 	gasLimit uint64,
+	baseFee *big.Int,
 	pubkey *common.Pubkey,
 ) (*Transaction, error) {
 	data, err := getDistributeForData(pubkey)
@@ -53,8 +55,9 @@ func NewPoLTx(
 	return NewTx(&PoLTx{
 		ChainID:  chainID,
 		To:       distributorAddress,
-		Nonce:    blockNumber.Uint64(),
+		Nonce:    distributionBlockNumber.Uint64(),
 		GasLimit: gasLimit,
+		GasPrice: baseFee,
 		Data:     data,
 	}), nil
 }
@@ -68,10 +71,14 @@ func (tx *PoLTx) copy() TxData {
 		To:       tx.To,
 		Nonce:    tx.Nonce,
 		GasLimit: tx.GasLimit,
+		GasPrice: new(big.Int),
 		Data:     common.CopyBytes(tx.Data),
 	}
 	if tx.ChainID != nil {
 		cpy.ChainID.Set(tx.ChainID)
+	}
+	if tx.GasPrice != nil {
+		cpy.GasPrice.Set(tx.GasPrice)
 	}
 	return cpy
 }
@@ -80,7 +87,7 @@ func (tx *PoLTx) chainID() *big.Int   { return tx.ChainID }
 func (*PoLTx) accessList() AccessList { return nil }
 func (tx *PoLTx) data() []byte        { return tx.Data }
 func (tx *PoLTx) gas() uint64         { return tx.GasLimit }
-func (*PoLTx) gasPrice() *big.Int     { return new(big.Int) }
+func (tx *PoLTx) gasPrice() *big.Int  { return tx.GasPrice }
 func (*PoLTx) gasTipCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) gasFeeCap() *big.Int    { return new(big.Int) }
 func (*PoLTx) value() *big.Int        { return new(big.Int) }
@@ -96,9 +103,10 @@ func (*PoLTx) setSignatureValues(chainID, v, r, s *big.Int) {
 	// No-op: PoLTx is originated from the system address and carries no signature.
 }
 
-// effectiveGasPrice is a no-op for PoLTx. PoLTx does not pay for gas.
-func (*PoLTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
-	return dst.SetUint64(0)
+// effectiveGasPrice is a no-op for PoLTx. PoLTx does not pay for gas, but we
+// return the baseFee here to make the receipt valid for a 1559 tx.
+func (tx *PoLTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+	return dst.Set(tx.GasPrice)
 }
 
 func (tx *PoLTx) encode(b *bytes.Buffer) error {
@@ -111,7 +119,7 @@ func (tx *PoLTx) decode(input []byte) error {
 
 func (tx *PoLTx) sigHash(chainID *big.Int) common.Hash {
 	return prefixedRlpHash(
-		PoLTxType, // tx type: 0x7D
+		PoLTxType, // tx type: 0x7E
 		[]any{
 			chainID,              // chainID: EIP-155 chain ID
 			params.SystemAddress, // from = system address

@@ -528,7 +528,7 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 		}
 		if conf.IsPrague1(num, g.Timestamp) {
 			// BRIP-0004: The parentProposerPubkey of the genesis block is always
-			// the zero hash. This is because the genesis block does not have a parent
+			// the zero pubkey. This is because the genesis block does not have a parent
 			// by definition.
 			head.ParentProposerPubkey = new(common.Pubkey)
 		}

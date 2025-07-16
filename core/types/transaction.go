@@ -51,7 +51,7 @@ const (
 	SetCodeTxType    = 0x04
 
 	// Berachain specific.
-	PoLTxType = 0x7D
+	PoLTxType = 0x7E
 )
 
 // Transaction is an Ethereum transaction.

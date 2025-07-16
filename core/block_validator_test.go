@@ -80,6 +80,7 @@ func makeBlock(parent *types.Header, txs types.Transactions, timestamp uint64) *
 		GasLimit:             params.GenesisGasLimit * 10,
 		Difficulty:           big.NewInt(1),
 		ParentProposerPubkey: samplePubkey(),
+		BaseFee:              big.NewInt(1000000000),
 	}
 	return types.NewBlock(header, &types.Body{Transactions: txs}, nil, trie.NewStackTrie(nil))
 }
@@ -90,7 +91,7 @@ func TestValidateBody_Prague1_Valid(t *testing.T) {
 	chain, validator := buildTestChain(t, cfg)
 
 	// Build PoL tx + dummy tx.
-	polTx, err := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, samplePubkey())
+	polTx, err := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, big.NewInt(1000000000), samplePubkey())
 	if err != nil {
 		t.Fatalf("failed to create PoL tx: %v", err)
 	}
@@ -110,7 +111,7 @@ func TestValidateBody_Prague1_InvalidHash(t *testing.T) {
 
 	// PoL tx with WRONG pubkey (different from header.ParentProposerPubkey).
 	wrongPk := &common.Pubkey{}
-	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, wrongPk)
+	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, big.NewInt(1000000000), wrongPk)
 	block := makeBlock(chain.CurrentHeader(), types.Transactions{polTx}, 1)
 
 	if err := validator.ValidateBody(block); err == nil {
@@ -123,7 +124,7 @@ func TestValidateBody_Prague1_MisplacedPoL(t *testing.T) {
 	cfg := newPrague1Config(distributor)
 	chain, validator := buildTestChain(t, cfg)
 
-	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, samplePubkey())
+	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, big.NewInt(1000000000), samplePubkey())
 	dummyTx := types.NewTx(&types.LegacyTx{Nonce: 1})
 	// PoL tx placed second.
 	block := makeBlock(chain.CurrentHeader(), types.Transactions{dummyTx, polTx}, 1)
@@ -142,7 +143,7 @@ func TestValidateBody_PrePrague1_PoLProhibited(t *testing.T) {
 	cfg.Berachain.Prague1.PoLDistributorAddress = distributor
 	chain, validator := buildTestChain(t, &cfg)
 
-	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, samplePubkey())
+	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, big.NewInt(1000000000), samplePubkey())
 	block := makeBlock(chain.CurrentHeader(), types.Transactions{polTx}, 1) // timestamp 1 < future
 
 	if err := validator.ValidateBody(block); err == nil {

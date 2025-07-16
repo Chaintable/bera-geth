@@ -42,8 +42,9 @@ func TestNewPoLTx_DataPacking(t *testing.T) {
 	distributor := common.HexToAddress("0x000000000000000000000000000000000000dEaD")
 	blockNum := big.NewInt(123)
 	pubkey := samplePubkey()
+	baseFee := big.NewInt(1000000000)
 
-	tx, err := NewPoLTx(chainID, distributor, blockNum, params.PoLTxGasLimit, pubkey)
+	tx, err := NewPoLTx(chainID, distributor, blockNum, params.PoLTxGasLimit, baseFee, pubkey)
 	if err != nil {
 		t.Fatalf("NewPoLTx returned error: %v", err)
 	}
@@ -70,8 +71,9 @@ func TestNewPoLTx_NegativeBlockNumber(t *testing.T) {
 	chainID := big.NewInt(1)
 	distributor := common.Address{}
 	negBlock := big.NewInt(-1)
+	baseFee := big.NewInt(1000000000)
 
-	tx, err := NewPoLTx(chainID, distributor, negBlock, params.PoLTxGasLimit, samplePubkey())
+	tx, err := NewPoLTx(chainID, distributor, negBlock, params.PoLTxGasLimit, baseFee, samplePubkey())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,7 +85,8 @@ func TestNewPoLTx_NegativeBlockNumber(t *testing.T) {
 // TestIsPoLDistribution exercises positive and negative cases for the helper.
 func TestIsPoLDistribution(t *testing.T) {
 	distributor := common.HexToAddress("0x1000000000000000000000000000000000000001")
-	tx, err := NewPoLTx(big.NewInt(1), distributor, big.NewInt(0), params.PoLTxGasLimit, samplePubkey())
+	baseFee := big.NewInt(1000000000)
+	tx, err := NewPoLTx(big.NewInt(1), distributor, big.NewInt(0), params.PoLTxGasLimit, baseFee, samplePubkey())
 	if err != nil {
 		t.Fatalf("failed to build PoL tx: %v", err)
 	}
@@ -113,7 +116,8 @@ func TestIsPoLDistribution(t *testing.T) {
 
 // TestPoLTx_RawSignatureValues confirms that PoLTx reports no signature.
 func TestPoLTx_RawSignatureValues(t *testing.T) {
-	tx, err := NewPoLTx(big.NewInt(1), common.Address{}, big.NewInt(0), params.PoLTxGasLimit, samplePubkey())
+	baseFee := big.NewInt(1000000000)
+	tx, err := NewPoLTx(big.NewInt(1), common.Address{}, big.NewInt(0), params.PoLTxGasLimit, baseFee, samplePubkey())
 	if err != nil {
 		t.Fatalf("failed to create PoL tx: %v", err)
 	}

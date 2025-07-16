@@ -495,6 +495,7 @@ func (args *TransactionArgs) ToTransaction(defaultType int, distributorAddress c
 			To:       *args.To,
 			Nonce:    uint64(*args.Nonce),
 			GasLimit: uint64(*args.Gas),
+			GasPrice: (*big.Int)(args.GasPrice),
 			Data:     args.data(),
 		}
 	case types.SetCodeTxType:

@@ -92,6 +92,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 			v.config.Berachain.Prague1.PoLDistributorAddress,
 			new(big.Int).Sub(block.Number(), big.NewInt(1)),
 			params.PoLTxGasLimit,
+			block.BaseFee(),
 			block.ProposerPubkey(),
 		)
 		if err != nil {

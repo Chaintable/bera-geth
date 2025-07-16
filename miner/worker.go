@@ -474,6 +474,7 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 			miner.chainConfig.Berachain.Prague1.PoLDistributorAddress,
 			new(big.Int).Sub(env.header.Number, big.NewInt(1)),
 			params.PoLTxGasLimit,
+			env.header.BaseFee,
 			env.header.ParentProposerPubkey,
 		)
 		if err != nil {

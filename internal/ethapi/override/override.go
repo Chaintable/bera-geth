@@ -131,7 +131,7 @@ type BlockOverrides struct {
 	BlobBaseFee    *hexutil.Big
 	BeaconRoot     *common.Hash
 	Withdrawals    *types.Withdrawals
-	ProposerPubkey *types.Pubkey
+	ProposerPubkey *common.Pubkey
 }
 
 // Apply overrides the given header fields into the given block context.

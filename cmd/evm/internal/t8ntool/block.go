@@ -56,7 +56,7 @@ type header struct {
 	BlobGasUsed           *uint64           `json:"blobGasUsed"   rlp:"optional"`
 	ExcessBlobGas         *uint64           `json:"excessBlobGas"   rlp:"optional"`
 	ParentBeaconBlockRoot *common.Hash      `json:"parentBeaconBlockRoot" rlp:"optional"`
-	ParentProposerPubkey  *types.Pubkey     `json:"parentProposerPubkey" rlp:"optional"`
+	ParentProposerPubkey  *common.Pubkey    `json:"parentProposerPubkey" rlp:"optional"`
 }
 
 type headerMarshaling struct {

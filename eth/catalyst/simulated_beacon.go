@@ -200,7 +200,7 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 		Withdrawals:           withdrawals,
 		Random:                random,
 		BeaconRoot:            &common.Hash{},
-		ProposerPubkey:        &types.Pubkey{},
+		ProposerPubkey:        &common.Pubkey{},
 	}, version, false)
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 		blobHashes     []common.Hash
 		beaconRoot     *common.Hash
 		requests       [][]byte
-		proposerPubkey *types.Pubkey
+		proposerPubkey *common.Pubkey
 	)
 	// Compute post-shanghai fields
 	if version > engine.PayloadV2 {
@@ -255,7 +255,7 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 		}
 		beaconRoot = &common.Hash{}
 		requests = envelope.Requests
-		proposerPubkey = &types.Pubkey{}
+		proposerPubkey = &common.Pubkey{}
 	}
 
 	// Mark the payload as canon

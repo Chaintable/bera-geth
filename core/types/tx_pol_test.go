@@ -26,9 +26,9 @@ import (
 )
 
 // samplePubkey returns a deterministic 48-byte pubkey for tests.
-func samplePubkey() *Pubkey {
-	var pk Pubkey
-	for i := 0; i < PubkeySize; i++ {
+func samplePubkey() *common.Pubkey {
+	var pk common.Pubkey
+	for i := 0; i < common.PubkeyLength; i++ {
 		pk[i] = byte(i)
 	}
 	return &pk

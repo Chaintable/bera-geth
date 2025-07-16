@@ -48,7 +48,7 @@ type PayloadAttributes struct {
 	SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
 	Withdrawals           []*types.Withdrawal `json:"withdrawals"`
 	BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
-	ProposerPubkey        *types.Pubkey       `json:"parentProposerPubkey"` // Berachain: only used prague1 and onwards
+	ProposerPubkey        *common.Pubkey      `json:"parentProposerPubkey"` // Berachain: only used prague1 and onwards
 }
 
 // JSON type overrides for PayloadAttributes.
@@ -219,7 +219,7 @@ func decodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
 // and that the blockhash of the constructed block matches the parameters. Nil
 // Withdrawals value will propagate through the returned block. Empty
 // Withdrawals value must be passed via non-nil, length 0 value in data.
-func ExecutableDataToBlock(data ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, requests [][]byte, proposerPubkey *types.Pubkey) (*types.Block, error) {
+func ExecutableDataToBlock(data ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, requests [][]byte, proposerPubkey *common.Pubkey) (*types.Block, error) {
 	block, err := ExecutableDataToBlockNoHash(data, versionedHashes, beaconRoot, requests, proposerPubkey)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ func ExecutableDataToBlock(data ExecutableData, versionedHashes []common.Hash, b
 // ExecutableDataToBlockNoHash is analogous to ExecutableDataToBlock, but is used
 // for stateless execution, so it skips checking if the executable data hashes to
 // the requested hash (stateless has to *compute* the root hash, it's not given).
-func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, requests [][]byte, proposerPubkey *types.Pubkey) (*types.Block, error) {
+func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, requests [][]byte, proposerPubkey *common.Pubkey) (*types.Block, error) {
 	txs, err := decodeTransactions(data.Transactions)
 	if err != nil {
 		return nil, err

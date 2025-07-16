@@ -44,7 +44,7 @@ func NewPoLTx(
 	distributorAddress common.Address,
 	blockNumber *big.Int,
 	gasLimit uint64,
-	pubkey *Pubkey,
+	pubkey *common.Pubkey,
 ) (*Transaction, error) {
 	data, err := getDistributeForData(pubkey)
 	if err != nil {
@@ -132,7 +132,7 @@ var (
 )
 
 // getDistributeForData returns the tx data for the `distributeFor(bytes pubkey)` method.
-func getDistributeForData(pubkey *Pubkey) ([]byte, error) {
+func getDistributeForData(pubkey *common.Pubkey) ([]byte, error) {
 	arguments, err := distributeForMethod.Inputs.Pack(pubkey.Bytes())
 	if err != nil {
 		return nil, err

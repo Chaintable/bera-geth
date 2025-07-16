@@ -38,7 +38,7 @@ func (b btHeader) MarshalJSON() ([]byte, error) {
 		BlobGasUsed           *math.HexOrDecimal64
 		ExcessBlobGas         *math.HexOrDecimal64
 		ParentBeaconBlockRoot *common.Hash
-		ParentProposerPubkey  *types.Pubkey
+		ParentProposerPubkey  *common.Pubkey
 	}
 	var enc btHeader
 	enc.Bloom = b.Bloom
@@ -90,7 +90,7 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 		BlobGasUsed           *math.HexOrDecimal64
 		ExcessBlobGas         *math.HexOrDecimal64
 		ParentBeaconBlockRoot *common.Hash
-		ParentProposerPubkey  *types.Pubkey
+		ParentProposerPubkey  *common.Pubkey
 	}
 	var dec btHeader
 	if err := json.Unmarshal(input, &dec); err != nil {

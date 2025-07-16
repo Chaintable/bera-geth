@@ -79,7 +79,7 @@ func TestGeneratePOSChain(t *testing.T) {
 
 	genchain, genreceipts := GenerateChain(gspec.Config, genesis, engine, gendb, 4, func(i int, gen *BlockGen) {
 		gen.SetParentBeaconRoot(common.Hash{byte(i + 1)})
-		gen.SetParentProposerPubkey(types.Pubkey{byte(i + 1)})
+		gen.SetParentProposerPubkey(common.Pubkey{byte(i + 1)})
 
 		// Add value transfer tx.
 		tx := types.MustSignNewTx(key, gen.Signer(), &types.LegacyTx{
@@ -181,7 +181,7 @@ func TestGeneratePOSChain(t *testing.T) {
 		}
 
 		// Verify proposer pubkey.
-		expect := types.Pubkey{byte(blocknum)}
+		expect := common.Pubkey{byte(blocknum)}
 		if got := block.ProposerPubkey(); *got != expect {
 			t.Fatalf("block %d, wrong proposer pubkey: got %s, want %s", i, got, expect)
 		}

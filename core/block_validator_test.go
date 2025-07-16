@@ -63,9 +63,9 @@ func buildTestChain(t *testing.T, cfg *params.ChainConfig) (*BlockChain, Validat
 }
 
 // samplePubkey returns a deterministic 48-byte pubkey for tests.
-func samplePubkey() *types.Pubkey {
-	var pk types.Pubkey
-	for i := 0; i < types.PubkeySize; i++ {
+func samplePubkey() *common.Pubkey {
+	var pk common.Pubkey
+	for i := 0; i < common.PubkeyLength; i++ {
 		pk[i] = byte(i)
 	}
 	return &pk
@@ -109,7 +109,7 @@ func TestValidateBody_Prague1_InvalidHash(t *testing.T) {
 	chain, validator := buildTestChain(t, cfg)
 
 	// PoL tx with WRONG pubkey (different from header.ParentProposerPubkey).
-	wrongPk := &types.Pubkey{}
+	wrongPk := &common.Pubkey{}
 	polTx, _ := types.NewPoLTx(cfg.ChainID, distributor, big.NewInt(0), params.PoLTxGasLimit, wrongPk)
 	block := makeBlock(chain.CurrentHeader(), types.Transactions{polTx}, 1)
 

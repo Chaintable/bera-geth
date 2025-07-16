@@ -485,9 +485,9 @@ func (sim *simulator) makeHeaders(blocks []simBlock) ([]*types.Header, error) {
 				parentBeaconRoot = overrides.BeaconRoot
 			}
 		}
-		var parentProposerPubkey *types.Pubkey
+		var parentProposerPubkey *common.Pubkey
 		if sim.chainConfig.IsPrague1(overrides.Number.ToInt(), (uint64)(*overrides.Time)) {
-			parentProposerPubkey = new(types.Pubkey)
+			parentProposerPubkey = new(common.Pubkey)
 			if overrides.ProposerPubkey != nil {
 				*parentProposerPubkey = *overrides.ProposerPubkey
 			}

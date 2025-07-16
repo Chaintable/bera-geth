@@ -1222,7 +1222,7 @@ func TestCall(t *testing.T) {
 			blockNumber: rpc.LatestBlockNumber,
 			call:        TransactionArgs{},
 			blockOverrides: override.BlockOverrides{
-				ProposerPubkey: &types.Pubkey{},
+				ProposerPubkey: &common.Pubkey{},
 			},
 			expectErr: errors.New(`block override "proposerPubkey" is not supported for this RPC method`),
 		},

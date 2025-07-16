@@ -104,7 +104,7 @@ func (b *BlockGen) SetParentBeaconRoot(root common.Hash) {
 
 // SetParentProposerPubkey sets the parent proposer pubkey field of the generated
 // block.
-func (b *BlockGen) SetParentProposerPubkey(pubkey types.Pubkey) {
+func (b *BlockGen) SetParentProposerPubkey(pubkey common.Pubkey) {
 	b.header.ParentProposerPubkey = &pubkey
 }
 
@@ -631,7 +631,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		header.ParentBeaconRoot = new(common.Hash)
 	}
 	if cm.config.IsPrague1(header.Number, header.Time) {
-		header.ParentProposerPubkey = new(types.Pubkey)
+		header.ParentProposerPubkey = new(common.Pubkey)
 	}
 	return header
 }

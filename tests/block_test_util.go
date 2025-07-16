@@ -97,7 +97,7 @@ type btHeader struct {
 	BlobGasUsed           *uint64
 	ExcessBlobGas         *uint64
 	ParentBeaconBlockRoot *common.Hash
-	ParentProposerPubkey  *types.Pubkey
+	ParentProposerPubkey  *common.Pubkey
 }
 
 type btHeaderMarshaling struct {

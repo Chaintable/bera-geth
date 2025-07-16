@@ -530,7 +530,7 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 			// BRIP-0004: The parentProposerPubkey of the genesis block is always
 			// the zero hash. This is because the genesis block does not have a parent
 			// by definition.
-			head.ParentProposerPubkey = new(types.Pubkey)
+			head.ParentProposerPubkey = new(common.Pubkey)
 		}
 	}
 	return types.NewBlock(head, &types.Body{Withdrawals: withdrawals}, nil, trie.NewStackTrie(nil))

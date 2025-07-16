@@ -39,11 +39,16 @@ const (
 	HashLength = 32
 	// AddressLength is the expected length of the address
 	AddressLength = 20
+
+	// Berachain: PubkeyLength represents the expected byte length of a BLS12-381 public key
+	// as used by the beacon chain.
+	PubkeyLength = 48
 )
 
 var (
 	hashT    = reflect.TypeOf(Hash{})
 	addressT = reflect.TypeOf(Address{})
+	pubkeyT  = reflect.TypeOf(Pubkey{})
 
 	// MaxAddress represents the maximum possible address value.
 	MaxAddress = HexToAddress("0xffffffffffffffffffffffffffffffffffffffff")
@@ -485,4 +490,46 @@ func (b PrettyBytes) TerminalString() string {
 		return fmt.Sprintf("%x", b)
 	}
 	return fmt.Sprintf("%#x...%x (%dB)", b[:3], b[len(b)-3:], len(b))
+}
+
+/////////// Berachain: Pubkey
+
+// Pubkey represents a fixed-length 48-byte BLS public key.
+// JSON and text serialization use 0x-prefixed hex strings.
+type Pubkey [PubkeyLength]byte
+
+// Bytes returns a copy of the underlying byte slice.
+func (p Pubkey) Bytes() []byte {
+	b := make([]byte, PubkeyLength)
+	copy(b, p[:])
+	return b
+}
+
+// SetBytes sets the address to the value of b.
+// If b is larger than len(a), b will be cropped from the left.
+func (p *Pubkey) SetBytes(b []byte) {
+	if len(b) > len(p) {
+		b = b[len(b)-PubkeyLength:]
+	}
+	copy(p[PubkeyLength-len(b):], b)
+}
+
+// String returns the hex-encoded string representation of the pubkey.
+func (p Pubkey) String() string {
+	return hexutil.Encode(p[:])
+}
+
+// MarshalText encodes the pubkey as a 0x-prefixed hex string.
+func (p Pubkey) MarshalText() ([]byte, error) {
+	return hexutil.Bytes(p[:]).MarshalText()
+}
+
+// UnmarshalText decodes a 0x-prefixed hex string into the pubkey.
+func (p *Pubkey) UnmarshalText(input []byte) error {
+	return hexutil.UnmarshalFixedText("Pubkey", input, p[:])
+}
+
+// UnmarshalJSON decodes a JSON string containing the 0x-prefixed hex pubkey.
+func (p *Pubkey) UnmarshalJSON(input []byte) error {
+	return hexutil.UnmarshalFixedJSON(pubkeyT, input, p[:])
 }

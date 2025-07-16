@@ -101,7 +101,7 @@ type stEnv struct {
 	ParentExcessBlobGas   *uint64                             `json:"parentExcessBlobGas,omitempty"`
 	ParentBlobGasUsed     *uint64                             `json:"parentBlobGasUsed,omitempty"`
 	ParentBeaconBlockRoot *common.Hash                        `json:"parentBeaconBlockRoot"`
-	ParentProposerPubkey  *types.Pubkey                       `json:"parentProposerPubkey"`
+	ParentProposerPubkey  *common.Pubkey                      `json:"parentProposerPubkey"`
 }
 
 type stEnvMarshaling struct {

@@ -60,7 +60,12 @@ var (
 )
 
 func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block) {
-	config := *params.AllEthashProtocolChanges
+	config := *params.AllDevChainProtocolChanges
+	zero := uint64(0)
+	config.Berachain.Prague1.Time = &zero
+	config.Berachain.Prague1.MinimumBaseFeeWei = 10 * params.Wei
+	config.Berachain.Prague1.BaseFeeChangeDenominator = 48
+	config.Berachain.Prague1.PoLDistributorAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
 	engine := beacon.New(ethash.NewFaker())
 	if merged {
 		config.TerminalTotalDifficulty = common.Big0
@@ -475,7 +480,7 @@ func TestFullAPI(t *testing.T) {
 	setupBlocks(t, ethservice, 10, parent, callback, nil, nil, nil)
 }
 
-func setupBlocks(t *testing.T, ethservice *eth.Ethereum, n int, parent *types.Header, callback func(parent *types.Header), withdrawals [][]*types.Withdrawal, beaconRoots []common.Hash, proposerPubkeys []types.Pubkey) []*types.Header {
+func setupBlocks(t *testing.T, ethservice *eth.Ethereum, n int, parent *types.Header, callback func(parent *types.Header), withdrawals [][]*types.Withdrawal, beaconRoots []common.Hash, proposerPubkeys []common.Pubkey) []*types.Header {
 	api := NewConsensusAPI(ethservice)
 	var blocks []*types.Header
 	for i := 0; i < n; i++ {
@@ -488,12 +493,12 @@ func setupBlocks(t *testing.T, ethservice *eth.Ethereum, n int, parent *types.He
 		if beaconRoots != nil {
 			h = &beaconRoots[i]
 		}
-		var p *types.Pubkey
+		var p *common.Pubkey
 		if proposerPubkeys != nil {
 			p = &proposerPubkeys[i]
 		}
 
-		envelope := getNewEnvelope(t, api, parent, w, h)
+		envelope := getNewEnvelope(t, api, parent, w, h, p)
 		execResp, err := api.newPayload(*envelope.ExecutionPayload, []common.Hash{}, h, envelope.Requests, false, p)
 		if err != nil {
 			t.Fatalf("can't execute payload: %v", err)
@@ -664,12 +669,13 @@ func TestNewPayloadOnInvalidChain(t *testing.T) {
 
 func assembleEnvelope(api *ConsensusAPI, parentHash common.Hash, params *engine.PayloadAttributes) (*engine.ExecutionPayloadEnvelope, error) {
 	args := &miner.BuildPayloadArgs{
-		Parent:       parentHash,
-		Timestamp:    params.Timestamp,
-		FeeRecipient: params.SuggestedFeeRecipient,
-		Random:       params.Random,
-		Withdrawals:  params.Withdrawals,
-		BeaconRoot:   params.BeaconRoot,
+		Parent:         parentHash,
+		Timestamp:      params.Timestamp,
+		FeeRecipient:   params.SuggestedFeeRecipient,
+		Random:         params.Random,
+		Withdrawals:    params.Withdrawals,
+		BeaconRoot:     params.BeaconRoot,
+		ProposerPubkey: params.ProposerPubkey,
 	}
 	payload, err := api.eth.Miner().BuildPayload(args, false)
 	if err != nil {
@@ -698,7 +704,7 @@ func TestEmptyBlocks(t *testing.T) {
 	setupBlocks(t, ethservice, 10, commonAncestor, func(parent *types.Header) {}, nil, nil, nil)
 
 	// (1) check LatestValidHash by sending a normal payload (P1'')
-	payload := getNewPayload(t, api, commonAncestor, nil, nil)
+	payload := getNewPayload(t, api, commonAncestor, nil, nil, nil)
 
 	status, err := api.NewPayloadV1(*payload)
 	if err != nil {
@@ -712,7 +718,7 @@ func TestEmptyBlocks(t *testing.T) {
 	}
 
 	// (2) Now send P1' which is invalid
-	payload = getNewPayload(t, api, commonAncestor, nil, nil)
+	payload = getNewPayload(t, api, commonAncestor, nil, nil, nil)
 	payload.GasUsed += 1
 	payload = setBlockhash(payload)
 	// Now latestValidHash should be the common ancestor
@@ -730,7 +736,7 @@ func TestEmptyBlocks(t *testing.T) {
 	}
 
 	// (3) Now send a payload with unknown parent
-	payload = getNewPayload(t, api, commonAncestor, nil, nil)
+	payload = getNewPayload(t, api, commonAncestor, nil, nil, nil)
 	payload.ParentHash = common.Hash{1}
 	payload = setBlockhash(payload)
 	// Now latestValidHash should be the common ancestor
@@ -746,13 +752,14 @@ func TestEmptyBlocks(t *testing.T) {
 	}
 }
 
-func getNewEnvelope(t *testing.T, api *ConsensusAPI, parent *types.Header, withdrawals []*types.Withdrawal, beaconRoot *common.Hash) *engine.ExecutionPayloadEnvelope {
+func getNewEnvelope(t *testing.T, api *ConsensusAPI, parent *types.Header, withdrawals []*types.Withdrawal, beaconRoot *common.Hash, proposerPubkey *common.Pubkey) *engine.ExecutionPayloadEnvelope {
 	params := engine.PayloadAttributes{
 		Timestamp:             parent.Time + 1,
 		Random:                crypto.Keccak256Hash([]byte{byte(1)}),
 		SuggestedFeeRecipient: parent.Coinbase,
 		Withdrawals:           withdrawals,
 		BeaconRoot:            beaconRoot,
+		ProposerPubkey:        proposerPubkey,
 	}
 
 	envelope, err := assembleEnvelope(api, parent.Hash(), &params)
@@ -762,8 +769,8 @@ func getNewEnvelope(t *testing.T, api *ConsensusAPI, parent *types.Header, withd
 	return envelope
 }
 
-func getNewPayload(t *testing.T, api *ConsensusAPI, parent *types.Header, withdrawals []*types.Withdrawal, beaconRoot *common.Hash) *engine.ExecutableData {
-	return getNewEnvelope(t, api, parent, withdrawals, beaconRoot).ExecutionPayload
+func getNewPayload(t *testing.T, api *ConsensusAPI, parent *types.Header, withdrawals []*types.Withdrawal, beaconRoot *common.Hash, proposerPubkey *common.Pubkey) *engine.ExecutableData {
+	return getNewEnvelope(t, api, parent, withdrawals, beaconRoot, proposerPubkey).ExecutionPayload
 }
 
 // setBlockhash sets the blockhash of a modified ExecutableData.
@@ -833,7 +840,7 @@ func TestTrickRemoteBlockCache(t *testing.T) {
 	//invalidChain = append(invalidChain, payload1)
 
 	// create an invalid payload2 (P2)
-	payload2 := getNewPayload(t, apiA, commonAncestor, nil, nil)
+	payload2 := getNewPayload(t, apiA, commonAncestor, nil, nil, nil)
 	//payload2.ParentHash = payload1.BlockHash
 	payload2.GasUsed += 1
 	payload2 = setBlockhash(payload2)
@@ -842,7 +849,7 @@ func TestTrickRemoteBlockCache(t *testing.T) {
 	head := payload2
 	// create some valid payloads on top
 	for i := 0; i < 10; i++ {
-		payload := getNewPayload(t, apiA, commonAncestor, nil, nil)
+		payload := getNewPayload(t, apiA, commonAncestor, nil, nil, nil)
 		payload.ParentHash = head.BlockHash
 		payload = setBlockhash(payload)
 		invalidChain = append(invalidChain, payload)
@@ -882,7 +889,7 @@ func TestInvalidBloom(t *testing.T) {
 	setupBlocks(t, ethservice, 10, commonAncestor, func(parent *types.Header) {}, nil, nil, nil)
 
 	// (1) check LatestValidHash by sending a normal payload (P1'')
-	payload := getNewPayload(t, api, commonAncestor, nil, nil)
+	payload := getNewPayload(t, api, commonAncestor, nil, nil, nil)
 	payload.LogsBloom = append(payload.LogsBloom, byte(1))
 	status, err := api.NewPayloadV1(*payload)
 	if err != nil {
@@ -1237,6 +1244,7 @@ func setupBodies(t *testing.T) (*node.Node, *eth.Ethereum, []*types.Block) {
 	genesis.Config.ShanghaiTime = &time
 	genesis.Config.CancunTime = &time
 	genesis.Config.PragueTime = &time
+	genesis.Config.Berachain.Prague1.Time = &time
 	genesis.Config.BlobScheduleConfig = params.DefaultBlobSchedule
 
 	n, ethservice := startEthService(t, genesis, blocks)
@@ -1279,9 +1287,9 @@ func setupBodies(t *testing.T) (*node.Node, *eth.Ethereum, []*types.Block) {
 	}
 
 	// Make proposer pubkey update for each block.
-	proposerPubkeys := make([]types.Pubkey, 10)
+	proposerPubkeys := make([]common.Pubkey, 10)
 	for i := 0; i < 10; i++ {
-		proposerPubkeys[i] = types.Pubkey{byte(i)}
+		proposerPubkeys[i] = common.Pubkey{byte(i)}
 	}
 
 	// Create the blocks.

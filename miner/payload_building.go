@@ -43,7 +43,7 @@ type BuildPayloadArgs struct {
 	Random         common.Hash           // The provided randomness value
 	Withdrawals    types.Withdrawals     // The provided withdrawals
 	BeaconRoot     *common.Hash          // The provided beaconRoot (Cancun)
-	ProposerPubkey *types.Pubkey         // Berachain BRIP-0004: The provided proposer pubkey (Prague1)
+	ProposerPubkey *common.Pubkey        // Berachain BRIP-0004: The provided proposer pubkey (Prague1)
 	Version        engine.PayloadVersion // Versioning byte for payload id calculation.
 }
 

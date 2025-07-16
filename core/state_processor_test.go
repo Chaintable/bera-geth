@@ -407,7 +407,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	header.Root = common.BytesToHash(hasher.Sum(nil))
 	if config.IsPrague1(header.Number, header.Time) {
-		proposerPubkey := types.Pubkey{0x01, 0x02, 0x03}
+		proposerPubkey := common.Pubkey{0x01, 0x02, 0x03}
 		header.ParentProposerPubkey = &proposerPubkey
 	}
 	if config.IsCancun(header.Number, header.Time) {

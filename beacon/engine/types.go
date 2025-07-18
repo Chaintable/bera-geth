@@ -33,9 +33,10 @@ import (
 type PayloadVersion byte
 
 var (
-	PayloadV1 PayloadVersion = 0x1
-	PayloadV2 PayloadVersion = 0x2
-	PayloadV3 PayloadVersion = 0x3
+	PayloadV1    PayloadVersion = 0x1
+	PayloadV2    PayloadVersion = 0x2
+	PayloadV3    PayloadVersion = 0x3
+	PayloadV3P11 PayloadVersion = 0x31
 )
 
 //go:generate go run github.com/fjl/gencodec -type PayloadAttributes -field-override payloadAttributesMarshaling -out gen_blockparams.go

@@ -87,14 +87,17 @@ var caps = []string{
 	"engine_forkchoiceUpdatedV1",
 	"engine_forkchoiceUpdatedV2",
 	"engine_forkchoiceUpdatedV3",
+	"engine_forkchoiceUpdatedV3P11",
 	"engine_forkchoiceUpdatedWithWitnessV1",
 	"engine_forkchoiceUpdatedWithWitnessV2",
 	"engine_forkchoiceUpdatedWithWitnessV3",
+	"engine_forkchoiceUpdatedWithWitnessV3P11",
 	"engine_exchangeTransitionConfigurationV1",
 	"engine_getPayloadV1",
 	"engine_getPayloadV2",
 	"engine_getPayloadV3",
 	"engine_getPayloadV4",
+	"engine_getPayloadV4P11",
 	"engine_getPayloadV5",
 	"engine_getBlobsV1",
 	"engine_getBlobsV2",
@@ -102,14 +105,17 @@ var caps = []string{
 	"engine_newPayloadV2",
 	"engine_newPayloadV3",
 	"engine_newPayloadV4",
+	"engine_newPayloadV4P11",
 	"engine_newPayloadWithWitnessV1",
 	"engine_newPayloadWithWitnessV2",
 	"engine_newPayloadWithWitnessV3",
 	"engine_newPayloadWithWitnessV4",
+	"engine_newPayloadWithWitnessV4P11",
 	"engine_executeStatelessPayloadV1",
 	"engine_executeStatelessPayloadV2",
 	"engine_executeStatelessPayloadV3",
 	"engine_executeStatelessPayloadV4",
+	"engine_executeStatelessPayloadV4P11",
 	"engine_getPayloadBodiesByHashV1",
 	"engine_getPayloadBodiesByHashV2",
 	"engine_getPayloadBodiesByRangeV1",
@@ -245,14 +251,14 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV2(update engine.ForkchoiceStateV1, pa
 func (api *ConsensusAPI) ForkchoiceUpdatedV3(update engine.ForkchoiceStateV1, params *engine.PayloadAttributes) (engine.ForkChoiceResponse, error) {
 	if params != nil {
 		switch {
+		case params.ProposerPubkey != nil:
+			return engine.STATUS_INVALID, attributesErr("unexpected proposer pubkey")
 		case params.Withdrawals == nil:
 			return engine.STATUS_INVALID, attributesErr("missing withdrawals")
 		case params.BeaconRoot == nil:
 			return engine.STATUS_INVALID, attributesErr("missing beacon root")
-		case api.checkFork(params.Timestamp, forks.Prague1, forks.Osaka) && params.ProposerPubkey == nil:
-			return engine.STATUS_INVALID, attributesErr("starting in prague1, proposer pubkey is required")
-		case !api.checkFork(params.Timestamp, forks.Cancun, forks.Prague, forks.Prague1, forks.Osaka):
-			return engine.STATUS_INVALID, unsupportedForkErr("fcuV3 must only be called for cancun or prague or osaka payloads")
+		case !api.checkFork(params.Timestamp, forks.Cancun, forks.Prague, forks.Osaka):
+			return engine.STATUS_INVALID, unsupportedForkErr("fcuV3 must only be called for cancun or prague payloads")
 		}
 	}
 	// TODO(matt): the spec requires that fcu is applied when called on a valid
@@ -260,6 +266,28 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV3(update engine.ForkchoiceStateV1, pa
 	// forkchoiceUpdate into a function that only updates the head and then a
 	// function that kicks off block construction.
 	return api.forkchoiceUpdated(update, params, engine.PayloadV3, false)
+}
+
+// ForkchoiceUpdatedV3P11 is equivalent to V3 with the addition of parents proposer pubkey
+// in the payload attributes. It supports only PayloadAttributesV3P11.
+func (api *ConsensusAPI) ForkchoiceUpdatedV3P11(update engine.ForkchoiceStateV1, params *engine.PayloadAttributes) (engine.ForkChoiceResponse, error) {
+	if params != nil {
+		switch {
+		case params.Withdrawals == nil:
+			return engine.STATUS_INVALID, attributesErr("missing withdrawals")
+		case params.BeaconRoot == nil:
+			return engine.STATUS_INVALID, attributesErr("missing beacon root")
+		case params.ProposerPubkey == nil:
+			return engine.STATUS_INVALID, attributesErr("missing proposer pubkey")
+		case !api.checkFork(params.Timestamp, forks.Prague1):
+			return engine.STATUS_INVALID, unsupportedForkErr("fcuV3P11 must only be called for prague1 payloads")
+		}
+	}
+	// TODO(matt): the spec requires that fcu is applied when called on a valid
+	// hash, even if params are wrong. To do this we need to split up
+	// forkchoiceUpdate into a function that only updates the head and then a
+	// function that kicks off block construction.
+	return api.forkchoiceUpdated(update, params, engine.PayloadV3P11, false)
 }
 
 func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payloadAttributes *engine.PayloadAttributes, payloadVersion engine.PayloadVersion, payloadWitness bool) (engine.ForkChoiceResponse, error) {
@@ -479,6 +507,14 @@ func (api *ConsensusAPI) GetPayloadV4(payloadID engine.PayloadID) (*engine.Execu
 	return api.getPayload(payloadID, false)
 }
 
+// GetPayloadV4P11 returns a cached payload by id.
+func (api *ConsensusAPI) GetPayloadV4P11(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
+	if !payloadID.Is(engine.PayloadV3P11) {
+		return nil, engine.UnsupportedFork
+	}
+	return api.getPayload(payloadID, false)
+}
+
 // GetPayloadV5 returns a cached payload by id.
 func (api *ConsensusAPI) GetPayloadV5(payloadID engine.PayloadID) (*engine.ExecutionPayloadEnvelope, error) {
 	if !payloadID.Is(engine.PayloadV3) {
@@ -640,7 +676,7 @@ func (api *ConsensusAPI) NewPayloadV3(params engine.ExecutableData, versionedHas
 }
 
 // NewPayloadV4 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
-func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, executionRequests []hexutil.Bytes, proposerPubkey *common.Pubkey) (engine.PayloadStatusV1, error) {
+func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, executionRequests []hexutil.Bytes) (engine.PayloadStatusV1, error) {
 	switch {
 	case params.Withdrawals == nil:
 		return invalidStatus, paramsErr("nil withdrawals post-shanghai")
@@ -654,10 +690,35 @@ func (api *ConsensusAPI) NewPayloadV4(params engine.ExecutableData, versionedHas
 		return invalidStatus, paramsErr("nil beaconRoot post-cancun")
 	case executionRequests == nil:
 		return invalidStatus, paramsErr("nil executionRequests post-prague")
-	case api.checkFork(params.Timestamp, forks.Prague1, forks.Osaka) && proposerPubkey == nil:
+	case !api.checkFork(params.Timestamp, forks.Prague, forks.Osaka):
+		return invalidStatus, unsupportedForkErr("newPayloadV4 must only be called for prague payloads")
+	}
+	requests := convertRequests(executionRequests)
+	if err := validateRequests(requests); err != nil {
+		return engine.PayloadStatusV1{Status: engine.INVALID}, engine.InvalidParams.With(err)
+	}
+	return api.newPayload(params, versionedHashes, beaconRoot, requests, false, nil)
+}
+
+// NewPayloadV4P11 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
+func (api *ConsensusAPI) NewPayloadV4P11(params engine.ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash, executionRequests []hexutil.Bytes, proposerPubkey *common.Pubkey) (engine.PayloadStatusV1, error) {
+	switch {
+	case params.Withdrawals == nil:
+		return invalidStatus, paramsErr("nil withdrawals post-shanghai")
+	case params.ExcessBlobGas == nil:
+		return invalidStatus, paramsErr("nil excessBlobGas post-cancun")
+	case params.BlobGasUsed == nil:
+		return invalidStatus, paramsErr("nil blobGasUsed post-cancun")
+	case versionedHashes == nil:
+		return invalidStatus, paramsErr("nil versionedHashes post-cancun")
+	case beaconRoot == nil:
+		return invalidStatus, paramsErr("nil beaconRoot post-cancun")
+	case executionRequests == nil:
+		return invalidStatus, paramsErr("nil executionRequests post-prague")
+	case proposerPubkey == nil:
 		return invalidStatus, paramsErr("nil proposerPubkey post-prague1")
-	case !api.checkFork(params.Timestamp, forks.Prague, forks.Prague1, forks.Osaka):
-		return invalidStatus, unsupportedForkErr("newPayloadV4 must only be called for prague or osaka payloads")
+	case !api.checkFork(params.Timestamp, forks.Prague1):
+		return invalidStatus, unsupportedForkErr("newPayloadV4P11 must only be called for prague1 payloads")
 	}
 	requests := convertRequests(executionRequests)
 	if err := validateRequests(requests); err != nil {

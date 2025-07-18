@@ -1044,6 +1044,8 @@ func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
 	switch {
 	case c.IsOsaka(london, time):
 		return forks.Osaka
+	case c.IsPrague1(london, time):
+		return forks.Prague1
 	case c.IsPrague(london, time):
 		return forks.Prague
 	case c.IsCancun(london, time):
@@ -1061,6 +1063,8 @@ func (c *ChainConfig) Timestamp(fork forks.Fork) *uint64 {
 	switch {
 	case fork == forks.Osaka:
 		return c.OsakaTime
+	case fork == forks.Prague1:
+		return c.Berachain.Prague1.Time
 	case fork == forks.Prague:
 		return c.PragueTime
 	case fork == forks.Cancun:

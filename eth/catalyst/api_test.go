@@ -60,12 +60,7 @@ var (
 )
 
 func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block) {
-	config := *params.AllDevChainProtocolChanges
-	zero := uint64(0)
-	config.Berachain.Prague1.Time = &zero
-	config.Berachain.Prague1.MinimumBaseFeeWei = 10 * params.Wei
-	config.Berachain.Prague1.BaseFeeChangeDenominator = 48
-	config.Berachain.Prague1.PoLDistributorAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	config := *params.AllEthashProtocolChanges
 	engine := beacon.New(ethash.NewFaker())
 	if merged {
 		config.TerminalTotalDifficulty = common.Big0
@@ -1244,7 +1239,6 @@ func setupBodies(t *testing.T) (*node.Node, *eth.Ethereum, []*types.Block) {
 	genesis.Config.ShanghaiTime = &time
 	genesis.Config.CancunTime = &time
 	genesis.Config.PragueTime = &time
-	genesis.Config.Berachain.Prague1.Time = &time
 	genesis.Config.BlobScheduleConfig = params.DefaultBlobSchedule
 
 	n, ethservice := startEthService(t, genesis, blocks)
@@ -1286,14 +1280,8 @@ func setupBodies(t *testing.T) (*node.Node, *eth.Ethereum, []*types.Block) {
 		beaconRoots[i] = common.Hash{byte(i)}
 	}
 
-	// Make proposer pubkey update for each block.
-	proposerPubkeys := make([]common.Pubkey, 10)
-	for i := 0; i < 10; i++ {
-		proposerPubkeys[i] = common.Pubkey{byte(i)}
-	}
-
 	// Create the blocks.
-	newHeaders := setupBlocks(t, ethservice, 10, parent, callback, withdrawals, beaconRoots, proposerPubkeys)
+	newHeaders := setupBlocks(t, ethservice, 10, parent, callback, withdrawals, beaconRoots, nil)
 	newBlocks := make([]*types.Block, len(newHeaders))
 	for i, header := range newHeaders {
 		newBlocks[i] = ethservice.BlockChain().GetBlock(header.Hash(), header.Number.Uint64())

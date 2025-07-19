@@ -104,7 +104,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	// Blob transactions may be present after the Cancun fork.
 	var blobs int
 	for i, tx := range block.Transactions() {
-		// Berachain: validate the PoL tx is only the first tx in the block. // TODO(BRIP-4): unit test.
+		// Berachain: validate the PoL tx is only the first tx in the block.
 		switch {
 		case isPrague1 && i == 0:
 			if tx.Hash() != expectedPoLHash {

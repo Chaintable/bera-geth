@@ -199,7 +199,37 @@ func (sim *simulator) execute(ctx context.Context, blocks []simBlock) ([]*simBlo
 		if err != nil {
 			return nil, err
 		}
-		// TODO(BRIP-4): Validate Prague1 block rules.
+
+		// Berachain: Pre-compute expected PoL tx hash when in Prague1.
+		isPrague1 := sim.chainConfig.IsPrague1(result.Number(), result.Time())
+		var expectedPoLHash common.Hash
+		if isPrague1 {
+			polTx, err := types.NewPoLTx(
+				sim.chainConfig.ChainID,
+				sim.chainConfig.Berachain.Prague1.PoLDistributorAddress,
+				new(big.Int).Sub(result.Number(), big.NewInt(1)),
+				params.PoLTxGasLimit,
+				result.BaseFee(),
+				result.ProposerPubkey(),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create expected PoL tx: %w", err)
+			}
+			expectedPoLHash = polTx.Hash()
+		}
+
+		// Berachain: validate the PoL tx is only the first tx in the block.
+		for i, tx := range result.Transactions() {
+			switch {
+			case isPrague1 && i == 0:
+				if tx.Hash() != expectedPoLHash {
+					return nil, fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
+				}
+			case types.IsPoLDistribution(tx.To(), tx.Data(), sim.chainConfig.Berachain.Prague1.PoLDistributorAddress):
+				return nil, fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
+			}
+		}
+
 		headers[bi] = result.Header()
 		results[bi] = &simBlockResult{fullTx: sim.fullTx, chainConfig: sim.chainConfig, Block: result, Calls: callResults, senders: senders}
 		parent = result.Header()
@@ -488,9 +518,10 @@ func (sim *simulator) makeHeaders(blocks []simBlock) ([]*types.Header, error) {
 		var parentProposerPubkey *common.Pubkey
 		if sim.chainConfig.IsPrague1(overrides.Number.ToInt(), (uint64)(*overrides.Time)) {
 			parentProposerPubkey = new(common.Pubkey)
-			if overrides.ProposerPubkey != nil {
-				*parentProposerPubkey = *overrides.ProposerPubkey
+			if overrides.ProposerPubkey == nil {
+				return nil, errors.New("proposer pubkey override is required for post Prague1 blocks")
 			}
+			*parentProposerPubkey = *overrides.ProposerPubkey
 		}
 		header = overrides.MakeHeader(&types.Header{
 			UncleHash:            types.EmptyUncleHash,

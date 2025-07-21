@@ -243,7 +243,10 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 		// Setup the timer for terminating the process if SECONDS_PER_SLOT (2s in
 		// the Berachain configuration) have passed since the point in time identified
 		// by the timestamp parameter.
-		endTimer := time.NewTimer(time.Second * 2)
+		//
+		// Berachain: Using 4s for now to handle cases where block time exceeds 2s. To be
+		// verified further after stable block time is in effect.
+		endTimer := time.NewTimer(time.Second * 4)
 
 		fullParams := &generateParams{
 			timestamp:      args.Timestamp,

@@ -110,7 +110,8 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 			if tx.Hash() != expectedPoLHash {
 				return fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
 			}
-		case types.IsPoLDistribution(tx.To(), tx.Data(), v.config.Berachain.Prague1.PoLDistributorAddress):
+		case tx.Type() == types.PoLTxType ||
+			types.IsPoLDistribution(tx.To(), tx.Data(), v.config.Berachain.Prague1.PoLDistributorAddress):
 			return fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
 		}
 

@@ -225,7 +225,8 @@ func (sim *simulator) execute(ctx context.Context, blocks []simBlock) ([]*simBlo
 				if tx.Hash() != expectedPoLHash {
 					return nil, fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
 				}
-			case types.IsPoLDistribution(tx.To(), tx.Data(), sim.chainConfig.Berachain.Prague1.PoLDistributorAddress):
+			case tx.Type() == types.PoLTxType ||
+				types.IsPoLDistribution(tx.To(), tx.Data(), sim.chainConfig.Berachain.Prague1.PoLDistributorAddress):
 				return nil, fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
 			}
 		}

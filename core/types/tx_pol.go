@@ -159,6 +159,13 @@ func getDistributeForData(pubkey *common.Pubkey) ([]byte, error) {
 	return append(distributeForMethod.ID, arguments...), nil
 }
 
+// IsPoLDistribution returns true if the transaction is a PoL distribution.
+func IsPoLDistribution(to *common.Address, data []byte, distributorAddress common.Address) bool {
+	// Txs that call the `distributeFor(bytes pubkey)` method on the PoL Distributor
+	// contract are also consideredPoL txs.
+	return to != nil && *to == distributorAddress && isDistributeForCall(data)
+}
+
 // isDistributeForCall returns true if the provided calldata corresponds to a
 // call to the `distributeFor(bytes pubkey)` method defined in BRIP-0004.
 //
@@ -169,11 +176,4 @@ func isDistributeForCall(data []byte) bool {
 		return false
 	}
 	return bytes.Equal(data[:4], distributeForMethod.ID)
-}
-
-// IsPoLDistribution returns true if the transaction is a PoL distribution.
-func IsPoLDistribution(to *common.Address, data []byte, distributorAddress common.Address) bool {
-	// Txs that call the `distributeFor(bytes pubkey)` method on the PoL Distributor
-	// contract are also consideredPoL txs.
-	return to != nil && *to == distributorAddress && isDistributeForCall(data)
 }

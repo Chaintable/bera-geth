@@ -223,10 +223,9 @@ func (sim *simulator) execute(ctx context.Context, blocks []simBlock) ([]*simBlo
 			switch {
 			case isPrague1 && i == 0:
 				if tx.Hash() != expectedPoLHash {
-					return nil, fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
+					return nil, fmt.Errorf("PoL tx hash mismatch: have %v, want %v", tx.Hash(), expectedPoLHash)
 				}
-			case tx.Type() == types.PoLTxType ||
-				types.IsPoLDistribution(tx.To(), tx.Data(), sim.chainConfig.Berachain.Prague1.PoLDistributorAddress):
+			case tx.Type() == types.PoLTxType:
 				return nil, fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
 			}
 		}
@@ -311,15 +310,17 @@ func (sim *simulator) processBlock(ctx context.Context, block *simBlock, header,
 			return nil, nil, nil, err
 		}
 		var (
-			tx     = call.ToTransaction(types.DynamicFeeTxType, sim.chainConfig.Berachain.Prague1.PoLDistributorAddress)
-			txHash = tx.Hash()
+			isPrague1          = sim.chainConfig.IsPrague1(header.Number, header.Time)
+			distributorAddress = sim.chainConfig.Berachain.Prague1.PoLDistributorAddress
+			tx                 = call.ToTransaction(types.DynamicFeeTxType, isPrague1, distributorAddress)
+			txHash             = tx.Hash()
 		)
 		txes[i] = tx
 		senders[txHash] = call.from()
 		tracer.reset(txHash, uint(i))
 		sim.state.SetTxContext(txHash, i)
 		// EoA check is always skipped, even in validation mode.
-		msg := call.ToMessage(header.BaseFee, !sim.validate, true, sim.chainConfig.Berachain.Prague1.PoLDistributorAddress)
+		msg := call.ToMessage(header.BaseFee, !sim.validate, true, isPrague1, distributorAddress)
 		result, err := applyMessageWithEVM(ctx, evm, msg, timeout, sim.gp)
 		if err != nil {
 			txErr := txValidationError(err)

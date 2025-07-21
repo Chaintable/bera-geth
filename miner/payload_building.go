@@ -244,7 +244,7 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 		// the Berachain configuration) have passed since the point in time identified
 		// by the timestamp parameter.
 		//
-		// Berachain: Using 4s for now to handle cases where block time exceeds 2s. To be
+		// TODO(Berachain): Using 4s for now to handle cases where block time exceeds 2s. To be
 		// verified further after stable block time is in effect.
 		endTimer := time.NewTimer(time.Second * 4)
 

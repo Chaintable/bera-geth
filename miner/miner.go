@@ -143,6 +143,8 @@ func (miner *Miner) BuildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 //
 // Berachain: Note that the correct PoL tx is not included in the pending block as the
 // parent proposer pubkey of the pending block is not made available here.
+//
+// TODO(BRIP-4): Include parent proposer pubkey as soon as it is made available by CL.
 func (miner *Miner) getPending() *newPayloadResult {
 	header := miner.chain.CurrentHeader()
 	miner.pendingMu.Lock()

@@ -108,10 +108,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		switch {
 		case isPrague1 && i == 0:
 			if tx.Hash() != expectedPoLHash {
-				return fmt.Errorf("PoL tx invalid: have %v, want %v", tx.Hash(), expectedPoLHash)
+				return fmt.Errorf("PoL tx hash mismatch: have %v, want %v", tx.Hash(), expectedPoLHash)
 			}
-		case tx.Type() == types.PoLTxType ||
-			types.IsPoLDistribution(tx.To(), tx.Data(), v.config.Berachain.Prague1.PoLDistributorAddress):
+		case tx.Type() == types.PoLTxType:
 			return fmt.Errorf("invalid block: tx at index %d is a PoL tx", i)
 		}
 

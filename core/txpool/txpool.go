@@ -327,9 +327,8 @@ func (p *TxPool) Add(txs []*types.Transaction, sync bool) []error {
 		// Mark this transaction belonging to no-subpool
 		splits[i] = -1
 
-		// Berachain: transactions to PoL's distributeFor are rejected.
-		if tx.Type() == types.PoLTxType ||
-			types.IsPoLDistribution(tx.To(), tx.Data(), p.chain.Config().Berachain.Prague1.PoLDistributorAddress) {
+		// Berachain: PoL txs are rejected.
+		if tx.Type() == types.PoLTxType {
 			continue
 		}
 

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -86,8 +87,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	// Berachain: Pre-compute expected PoL tx hash when in Prague1.
 	isPrague1 := v.config.IsPrague1(block.Number(), block.Time())
 	var expectedPoLHash common.Hash
+	var polTx *types.Transaction
+	var err error
 	if isPrague1 {
-		polTx, err := types.NewPoLTx(
+		polTx, err = types.NewPoLTx(
 			v.config.ChainID,
 			v.config.Berachain.Prague1.PoLDistributorAddress,
 			new(big.Int).Sub(block.Number(), big.NewInt(1)),
@@ -108,6 +111,8 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 		switch {
 		case isPrague1 && i == 0:
 			if tx.Hash() != expectedPoLHash {
+				fmt.Println("full PoL tx got", spew.Sdump(tx))
+				fmt.Println("full PoL tx wanted", spew.Sdump(polTx))
 				return fmt.Errorf("PoL tx hash mismatch: have %v, want %v", tx.Hash(), expectedPoLHash)
 			}
 		case tx.Type() == types.PoLTxType:

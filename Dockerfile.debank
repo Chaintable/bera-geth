@@ -1,0 +1,27 @@
+# builder image
+FROM golang:1.24-bookworm AS builder
+
+ARG GITHUB_TOKEN
+
+RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+
+WORKDIR /bera-geth
+
+COPY . .
+
+RUN go mod download
+
+RUN make bera-geth
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y ca-certificates wget libsnappy-dev libjemalloc-dev
+
+
+WORKDIR /app
+
+COPY --from=builder /bera-geth/build/bin/bera-geth /usr/bin
+
+EXPOSE 8545 8546 33688 33688/udp
+
+ENTRYPOINT ["/usr/bin/bera-geth"]

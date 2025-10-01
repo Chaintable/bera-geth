@@ -2,6 +2,8 @@
 FROM golang:1.24-bookworm AS builder
 
 ARG GITHUB_TOKEN
+ARG COMMIT
+ARG VERSION
 
 RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
 
@@ -11,7 +13,7 @@ COPY . .
 
 RUN go mod download
 
-RUN make bera-geth
+RUN go run build/ci.go install -static -git-tag="$VERSION" -git-commit="$COMMIT" ./cmd/bera-geth
 
 FROM ubuntu:24.04
 

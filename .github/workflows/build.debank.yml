@@ -42,6 +42,7 @@ jobs:
           else
             echo "REVISION=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
           fi
+          echo "COMMIT=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -59,7 +60,10 @@ jobs:
           context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ matrix.arch }}-${{ env.REVISION }}
-          build-args: GITHUB_TOKEN=${{ steps.generate-token.outputs.token }}
+          build-args: |
+            GITHUB_TOKEN=${{ steps.generate-token.outputs.token }}
+            VERSION=${{ env.REVISION }}
+            COMMIT=${{ env.COMMIT }}
           provenance: false
 
       - name: Lark Notification

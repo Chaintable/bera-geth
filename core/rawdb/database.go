@@ -330,7 +330,6 @@ func Open(db ethdb.KeyValueStore, opts OpenOptions) (ethdb.Database, error) {
 		}()
 	}
 	return &freezerdb{
-		readOnly:      opts.ReadOnly,
 		ancientRoot:   opts.Ancient,
 		KeyValueStore: db,
 		chainFreezer:  frdb,

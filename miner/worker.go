@@ -38,6 +38,13 @@ import (
 )
 
 var (
+	// ERC20 Transfer event signature: keccak256("Transfer(address,address,uint256)")
+	transferSig = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+	// InternalBalanceChanged event signature: keccak256("InternalBalanceChanged(address,address,int256)")
+	internalBalanceChangedSig = common.HexToHash("0x18e1ea4139e68413d7d08aa752e71568e36b2c5bf940893314c2c5b01eaa0c42")
+)
+
+var (
 	errBlockInterruptedByNewHead  = errors.New("new head arrived while building block")
 	errBlockInterruptedByRecommit = errors.New("recommit interrupt while building block")
 	errBlockInterruptedByTimeout  = errors.New("timeout while building block")
@@ -121,6 +128,13 @@ func (miner *Miner) generateWork(genParam *generateParams, witness bool) *newPay
 	}
 	// Also add size of withdrawals to work block size.
 	work.size += uint64(genParam.withdrawals.Size())
+
+	// Berachain: Post-Prague1 we commit the PoL tx even when building an empty block.
+	// This is a safety measure to ensure that if the payload is requested early, the
+	// returned payload satisfies the Prague1 requirements, i.e. include the PoL tx.
+	if err = miner.commitPoLTx(work); err != nil {
+		return &newPayloadResult{err: err}
+	}
 
 	if !genParam.noTxs {
 		interrupt := new(atomic.Int32)
@@ -298,6 +312,39 @@ func (miner *Miner) commitTransaction(env *environment, tx *types.Transaction) e
 	if err != nil {
 		return err
 	}
+
+	// Prague3 validation: Skip transaction if it contains ERC20 transfers from/to blocked addresses
+	if miner.chainConfig.IsPrague3(env.header.Number, env.header.Time) {
+		for _, log := range receipt.Logs {
+			// Check if this is a Transfer event (first topic is the event signature)
+			if len(log.Topics) >= 3 && log.Topics[0] == transferSig {
+				// Transfer event has indexed from (topics[1]) and to (topics[2]) addresses
+				fromAddr := common.BytesToAddress(log.Topics[1].Bytes())
+				toAddr := common.BytesToAddress(log.Topics[2].Bytes())
+
+				// Check if the transfer is from or to the BEX vault.
+				if fromAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress ||
+					toAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress {
+					return errors.New("prague3: blob transaction contains ERC20 transfer to/from BEX vault")
+				}
+
+				// Check if either from or to address is blocked
+				for _, blockedAddr := range miner.chainConfig.Berachain.Prague3.BlockedAddresses {
+					if (fromAddr == blockedAddr && toAddr != miner.chainConfig.Berachain.Prague3.RescueAddress) ||
+						(toAddr == blockedAddr) {
+						// Revert the transaction and skip it
+						return errors.New("prague3: transaction contains ERC20 transfer from/to blocked address")
+					}
+				}
+			}
+
+			// Check if this is an InternalBalanceChanged event from BEX (first topic is the event signature).
+			if log.Address == miner.chainConfig.Berachain.Prague3.BexVaultAddress && len(log.Topics) > 0 && log.Topics[0] == internalBalanceChangedSig {
+				return errors.New("prague3: transaction contains InternalBalanceChanged event from BEX vault")
+			}
+		}
+	}
+
 	env.txs = append(env.txs, tx)
 	env.receipts = append(env.receipts, receipt)
 	env.size += tx.Size()
@@ -322,6 +369,39 @@ func (miner *Miner) commitBlobTransaction(env *environment, tx *types.Transactio
 	if err != nil {
 		return err
 	}
+
+	// Prague3 validation: Skip blob transaction if it contains ERC20 transfers from/to blocked addresses.
+	if miner.chainConfig.IsPrague3(env.header.Number, env.header.Time) {
+		for _, log := range receipt.Logs {
+			// Check if this is a Transfer event (first topic is the event signature).
+			if len(log.Topics) >= 3 && log.Topics[0] == transferSig {
+				// Transfer event has indexed from (topics[1]) and to (topics[2]) addresses.
+				fromAddr := common.BytesToAddress(log.Topics[1].Bytes())
+				toAddr := common.BytesToAddress(log.Topics[2].Bytes())
+
+				// Check if the transfer is from or to the BEX vault.
+				if fromAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress ||
+					toAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress {
+					return errors.New("prague3: blob transaction contains ERC20 transfer to/from BEX vault")
+				}
+
+				// Check if either from or to address is blocked.
+				for _, blockedAddr := range miner.chainConfig.Berachain.Prague3.BlockedAddresses {
+					if (fromAddr == blockedAddr && toAddr != miner.chainConfig.Berachain.Prague3.RescueAddress) ||
+						(toAddr == blockedAddr) {
+						// Revert the transaction and skip it
+						return errors.New("prague3: blob transaction contains ERC20 transfer from/to blocked address")
+					}
+				}
+			}
+
+			// Check if this is an InternalBalanceChanged event from BEX (first topic is the event signature).
+			if log.Address == miner.chainConfig.Berachain.Prague3.BexVaultAddress && len(log.Topics) > 0 && log.Topics[0] == internalBalanceChangedSig {
+				return errors.New("prague3: transaction contains InternalBalanceChanged event from BEX vault")
+			}
+		}
+	}
+
 	txNoBlob := tx.WithoutBlobTxSidecar()
 	env.txs = append(env.txs, txNoBlob)
 	env.receipts = append(env.receipts, receipt)
@@ -483,16 +563,8 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 	return nil
 }
 
-// fillTransactions retrieves the pending transactions from the txpool and fills them
-// into the given sealing block. The transaction selection and ordering strategy can
-// be customized with the plugin in the future.
-func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) error {
-	miner.confMu.RLock()
-	tip := miner.config.GasPrice
-	prio := miner.prio
-	miner.confMu.RUnlock()
-
-	// Berachain: Post-Prague1, add PoL tx to the block according to BRIP-0004.
+// Berachain: Post-Prague1, add PoL tx to the block according to BRIP-0004.
+func (miner *Miner) commitPoLTx(env *environment) error {
 	if env.gasPool == nil {
 		// NOTE: this check is moved here from the commitTransactions loop because we are
 		// "committing" a transaction outside of the loop.
@@ -519,6 +591,17 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 			return err
 		}
 	}
+	return nil
+}
+
+// fillTransactions retrieves the pending transactions from the txpool and fills them
+// into the given sealing block. The transaction selection and ordering strategy can
+// be customized with the plugin in the future.
+func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) error {
+	miner.confMu.RLock()
+	tip := miner.config.GasPrice
+	prio := miner.prio
+	miner.confMu.RUnlock()
 
 	// Retrieve the pending transactions pre-filtered by the 1559/4844 dynamic fees
 	filter := txpool.PendingFilter{

@@ -38,13 +38,6 @@ import (
 )
 
 var (
-	// ERC20 Transfer event signature: keccak256("Transfer(address,address,uint256)")
-	transferSig = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
-	// InternalBalanceChanged event signature: keccak256("InternalBalanceChanged(address,address,int256)")
-	internalBalanceChangedSig = common.HexToHash("0x18e1ea4139e68413d7d08aa752e71568e36b2c5bf940893314c2c5b01eaa0c42")
-)
-
-var (
 	errBlockInterruptedByNewHead  = errors.New("new head arrived while building block")
 	errBlockInterruptedByRecommit = errors.New("recommit interrupt while building block")
 	errBlockInterruptedByTimeout  = errors.New("timeout while building block")
@@ -290,7 +283,7 @@ func (miner *Miner) makeEnv(parent *types.Header, header *types.Header, coinbase
 		if err != nil {
 			return nil, err
 		}
-		state.StartPrefetcher("miner", bundle)
+		state.StartPrefetcher("miner", bundle, nil)
 	}
 	// Note the passed coinbase may be different with header.Coinbase.
 	return &environment{
@@ -311,38 +304,6 @@ func (miner *Miner) commitTransaction(env *environment, tx *types.Transaction) e
 	receipt, err := miner.applyTransaction(env, tx)
 	if err != nil {
 		return err
-	}
-
-	// Prague3 validation: Skip transaction if it contains ERC20 transfers from/to blocked addresses
-	if miner.chainConfig.IsPrague3(env.header.Number, env.header.Time) {
-		for _, log := range receipt.Logs {
-			// Check if this is a Transfer event (first topic is the event signature)
-			if len(log.Topics) >= 3 && log.Topics[0] == transferSig {
-				// Transfer event has indexed from (topics[1]) and to (topics[2]) addresses
-				fromAddr := common.BytesToAddress(log.Topics[1].Bytes())
-				toAddr := common.BytesToAddress(log.Topics[2].Bytes())
-
-				// Check if the transfer is from or to the BEX vault.
-				if fromAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress ||
-					toAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress {
-					return errors.New("prague3: blob transaction contains ERC20 transfer to/from BEX vault")
-				}
-
-				// Check if either from or to address is blocked
-				for _, blockedAddr := range miner.chainConfig.Berachain.Prague3.BlockedAddresses {
-					if (fromAddr == blockedAddr && toAddr != miner.chainConfig.Berachain.Prague3.RescueAddress) ||
-						(toAddr == blockedAddr) {
-						// Revert the transaction and skip it
-						return errors.New("prague3: transaction contains ERC20 transfer from/to blocked address")
-					}
-				}
-			}
-
-			// Check if this is an InternalBalanceChanged event from BEX (first topic is the event signature).
-			if log.Address == miner.chainConfig.Berachain.Prague3.BexVaultAddress && len(log.Topics) > 0 && log.Topics[0] == internalBalanceChangedSig {
-				return errors.New("prague3: transaction contains InternalBalanceChanged event from BEX vault")
-			}
-		}
 	}
 
 	env.txs = append(env.txs, tx)
@@ -368,38 +329,6 @@ func (miner *Miner) commitBlobTransaction(env *environment, tx *types.Transactio
 	receipt, err := miner.applyTransaction(env, tx)
 	if err != nil {
 		return err
-	}
-
-	// Prague3 validation: Skip blob transaction if it contains ERC20 transfers from/to blocked addresses.
-	if miner.chainConfig.IsPrague3(env.header.Number, env.header.Time) {
-		for _, log := range receipt.Logs {
-			// Check if this is a Transfer event (first topic is the event signature).
-			if len(log.Topics) >= 3 && log.Topics[0] == transferSig {
-				// Transfer event has indexed from (topics[1]) and to (topics[2]) addresses.
-				fromAddr := common.BytesToAddress(log.Topics[1].Bytes())
-				toAddr := common.BytesToAddress(log.Topics[2].Bytes())
-
-				// Check if the transfer is from or to the BEX vault.
-				if fromAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress ||
-					toAddr == miner.chainConfig.Berachain.Prague3.BexVaultAddress {
-					return errors.New("prague3: blob transaction contains ERC20 transfer to/from BEX vault")
-				}
-
-				// Check if either from or to address is blocked.
-				for _, blockedAddr := range miner.chainConfig.Berachain.Prague3.BlockedAddresses {
-					if (fromAddr == blockedAddr && toAddr != miner.chainConfig.Berachain.Prague3.RescueAddress) ||
-						(toAddr == blockedAddr) {
-						// Revert the transaction and skip it
-						return errors.New("prague3: blob transaction contains ERC20 transfer from/to blocked address")
-					}
-				}
-			}
-
-			// Check if this is an InternalBalanceChanged event from BEX (first topic is the event signature).
-			if log.Address == miner.chainConfig.Berachain.Prague3.BexVaultAddress && len(log.Topics) > 0 && log.Topics[0] == internalBalanceChangedSig {
-				return errors.New("prague3: transaction contains InternalBalanceChanged event from BEX vault")
-			}
-		}
 	}
 
 	txNoBlob := tx.WithoutBlobTxSidecar()
@@ -436,7 +365,6 @@ func (miner *Miner) applyTransaction(env *environment, tx *types.Transaction) (*
 
 func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *transactionsByPriceAndNonce, interrupt *atomic.Int32) error {
 	var (
-		isOsaka  = miner.chainConfig.IsOsaka(env.header.Number, env.header.Time)
 		isCancun = miner.chainConfig.IsCancun(env.header.Number, env.header.Time)
 	)
 	for {
@@ -513,21 +441,6 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		if !env.txFitsSize(tx) {
 			break
 		}
-
-		// Make sure all transactions after osaka have cell proofs
-		if isOsaka {
-			if sidecar := tx.BlobTxSidecar(); sidecar != nil {
-				if sidecar.Version == types.BlobSidecarVersion0 {
-					log.Info("Including blob tx with v0 sidecar, recomputing proofs", "hash", ltx.Hash)
-					if err := sidecar.ToV1(); err != nil {
-						txs.Pop()
-						log.Warn("Failed to recompute cell proofs", "hash", ltx.Hash, "err", err)
-						continue
-					}
-				}
-			}
-		}
-
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance in the transaction pool.
 		from, _ := types.Sender(env.signer, tx)
@@ -616,10 +529,15 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	if miner.chainConfig.IsOsaka(env.header.Number, env.header.Time) {
 		filter.GasLimitCap = params.MaxTxGas
 	}
-	filter.OnlyPlainTxs, filter.OnlyBlobTxs = true, false
+	filter.BlobTxs = false
 	pendingPlainTxs := miner.txpool.Pending(filter)
 
-	filter.OnlyPlainTxs, filter.OnlyBlobTxs = false, true
+	filter.BlobTxs = true
+	if miner.chainConfig.IsOsaka(env.header.Number, env.header.Time) {
+		filter.BlobVersion = types.BlobSidecarVersion1
+	} else {
+		filter.BlobVersion = types.BlobSidecarVersion0
+	}
 	pendingBlobTxs := miner.txpool.Pending(filter)
 
 	// Split the pending transactions into locals and remotes.
@@ -662,7 +580,6 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Int {
 	for i, tx := range block.Transactions() {
 		minerFee, _ := tx.EffectiveGasTip(block.BaseFee())
 		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
-		// TODO (MariusVanDerWijden) add blob fees
 	}
 	return feesWei
 }

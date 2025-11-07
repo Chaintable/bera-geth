@@ -241,9 +241,8 @@ func checksumToBytes(hash uint32) [4]byte {
 // them, one for the block number based forks and the second for the timestamps.
 func gatherForks(config *params.ChainConfig, genesis uint64) ([]uint64, []uint64) {
 	// Gather all the fork block numbers via reflection
-	kind := reflect.TypeOf(params.ChainConfig{})
+	kind := reflect.TypeFor[params.ChainConfig]()
 	conf := reflect.ValueOf(config).Elem()
-	x := uint64(0)
 	var (
 		forksByBlock []uint64
 		forksByTime  []uint64
@@ -258,19 +257,19 @@ func gatherForks(config *params.ChainConfig, genesis uint64) ([]uint64, []uint64
 		}
 
 		// Extract the fork rule block number or timestamp and aggregate it
-		if field.Type == reflect.TypeOf(&x) {
+		if field.Type == reflect.TypeFor[*uint64]() {
 			if rule := conf.Field(i).Interface().(*uint64); rule != nil {
 				forksByTime = append(forksByTime, *rule)
 			}
 		}
-		if field.Type == reflect.TypeOf(new(big.Int)) {
+		if field.Type == reflect.TypeFor[*big.Int]() {
 			if rule := conf.Field(i).Interface().(*big.Int); rule != nil {
 				forksByBlock = append(forksByBlock, rule.Uint64())
 			}
 		}
 	}
-	// Berachain-specific: include nested Prague1, Prague2, and Prague3 fork times in the fork id set
-	// so that clients using it (e.g. reth) compute the same fork checksum.
+	// Berachain-specific: include nested Prague1, Prague2, Prague3, Prague4 fork times in the fork
+	// id set so that clients using it (e.g. reth) compute the same fork checksum.
 	if config != nil && config.Berachain.Prague1.Time != nil {
 		forksByTime = append(forksByTime, *config.Berachain.Prague1.Time)
 	}
@@ -279,6 +278,9 @@ func gatherForks(config *params.ChainConfig, genesis uint64) ([]uint64, []uint64
 	}
 	if config != nil && config.Berachain.Prague3.Time != nil {
 		forksByTime = append(forksByTime, *config.Berachain.Prague3.Time)
+	}
+	if config != nil && config.Berachain.Prague4.Time != nil {
+		forksByTime = append(forksByTime, *config.Berachain.Prague4.Time)
 	}
 	slices.Sort(forksByBlock)
 	slices.Sort(forksByTime)

@@ -1,11 +1,8 @@
 # builder image
 FROM golang:1.24-bookworm AS builder
 
-ARG GITHUB_TOKEN=""
 ARG COMMIT
 ARG VERSION
-
-RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"; fi
 
 WORKDIR /bera-geth
 
@@ -18,7 +15,6 @@ RUN go run build/ci.go install -static -git-tag="$VERSION" -git-commit="$COMMIT"
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y ca-certificates wget libsnappy-dev libjemalloc-dev
-
 
 WORKDIR /app
 
